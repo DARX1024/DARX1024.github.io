@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { SITE, NAV } from '../site.config';
+import { getPosts } from '../lib/content';
 
 interface Props {
   title?: string;
@@ -11,6 +12,9 @@ const { title, description = SITE.description, wide = false } = Astro.props;
 const fullTitle = title ? `${title} · ${SITE.title}` : SITE.title;
 const path = Astro.url.pathname;
 const canonical = new URL(path, Astro.site);
+// 还没有文章的栏目先不放进导航
+const hasPosts = (await getPosts()).length > 0;
+const nav = NAV.filter((n) => n.href !== '/blog/' || hasPosts);
 ---
 
 <!doctype html>
@@ -45,7 +49,7 @@ const canonical = new URL(path, Astro.site);
         <a class="site-title" href="/"><span class="site-mark" aria-hidden="true"></span>{SITE.title}</a>
         <nav class="site-nav" aria-label="主导航">
           {
-            NAV.map((n) => (
+            nav.map((n) => (
               <a href={n.href} aria-current={path.startsWith(n.href) ? 'page' : undefined}>
                 {n.label}
               </a>

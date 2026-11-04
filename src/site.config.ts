@@ -2,8 +2,8 @@
 export const SITE = {
   title: 'Darx',
   author: 'Darx',
-  tagline: 'Generative Models · PhD Student', // 首页名字上方的一行小字
-  description: '生成式模型方向博士生。这里放我写的长文、课程笔记，以及一些帮助建立直觉的交互可视化。',
+  tagline: '', // 首页名字上方的一行小字，留空不显示
+  description: '生成式模型方向博士生。这里放我的课程笔记、长文，以及一些帮助建立直觉的交互可视化。',
   lang: 'zh-CN',
   github: 'https://github.com/DARX1024',
   email: '', // 留空则不显示

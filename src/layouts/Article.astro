@@ -172,23 +172,22 @@ const hasToc = showToc && toc.length >= 3;
 </style>
 
 <script>
-  // 目录高亮当前阅读位置
+  // 目录高亮当前阅读位置：最后一个已经滚过页面顶部的小标题
   const links = [...document.querySelectorAll<HTMLAnchorElement>('.toc a')];
-  if (links.length) {
-    const map = new Map(links.map((a) => [decodeURIComponent(a.hash.slice(1)), a]));
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          links.forEach((a) => a.classList.remove('active'));
-          map.get(e.target.id)?.classList.add('active');
-        }
-      },
-      { rootMargin: '0px 0px -70% 0px' },
-    );
-    map.forEach((_a, id) => {
-      const el = document.getElementById(id);
-      if (el) io.observe(el);
-    });
+  const heads = links
+    .map((a) => [a, document.getElementById(decodeURIComponent(a.hash.slice(1)))] as const)
+    .filter(([, h]) => h);
+  if (heads.length) {
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      let cur: HTMLAnchorElement | undefined;
+      for (const [a, h] of heads) if (h!.getBoundingClientRect().top < 140) cur = a;
+      // 滚到底时最后几节可能到不了顶部，直接算最后一节
+      if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4) cur = heads[heads.length - 1][0];
+      links.forEach((a) => a.classList.toggle('active', a === cur));
+    };
+    addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+    update();
   }
 </script>

@@ -25,6 +25,8 @@ interface Props {
 }
 const { note, series, index, prev, next } = Astro.props;
 const { Content, headings } = await render(note);
+const { lecture, course, textbook } = note.data;
+const position = lecture != null ? `第 ${lecture} 讲` : series && series.notes.length > 1 ? `${index + 1} / ${series.notes.length}` : '';
 ---
 
 <Article
@@ -39,11 +41,20 @@ const { Content, headings } = await render(note);
 >
   <p slot="kicker" class="kicker">
     <a href="/notes/">笔记</a>
-    {series && <> / <a href={`/notes/${series.id}/`}>{series.title}</a> <span class="num">· {index + 1}/{series.notes.length}</span></>}
+    {series && <> / <a href={`/notes/${series.id}/`}>{series.title}</a></>}
+    {position && <span class="num"> · {position}</span>}
   </p>
   <Content components={{ Viz }} />
   {
-    series && (
+    (course || textbook) && (
+      <dl slot="after" class="source">
+        {course && <><dt>课程</dt><dd>{course}{lecture != null && `，第 ${lecture} 讲`}</dd></>}
+        {textbook && <><dt>教材</dt><dd>{textbook}</dd></>}
+      </dl>
+    )
+  }
+  {
+    (prev || next) && (
       <nav slot="after" class="pager">
         {prev ? <a href={`/notes/${prev.id}/`}><span>← 上一篇</span>{titleOf(prev)}</a> : <span />}
         {next && <a class="next" href={`/notes/${next.id}/`}><span>下一篇 →</span>{titleOf(next)}</a>}
@@ -62,5 +73,21 @@ const { Content, headings } = await render(note);
   .kicker a {
     text-decoration: none;
     color: var(--accent);
+  }
+  .source {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.35rem 1rem;
+    margin: 3.5rem 0 0;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+  .source dt {
+    color: var(--fg-soft);
+  }
+  .source dd {
+    margin: 0;
   }
 </style>

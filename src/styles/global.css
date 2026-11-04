@@ -156,9 +156,7 @@ img {
   top: 0;
   z-index: 10;
   padding-block: 1rem;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: saturate(1.2) blur(12px);
-  -webkit-backdrop-filter: saturate(1.2) blur(12px);
+  background: var(--bg);
   border-bottom: 1px solid transparent;
   transition: border-color 0.2s;
 }

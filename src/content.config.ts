@@ -34,6 +34,9 @@ const notes = defineCollection({
   schema: z.object({
     ...base,
     order: z.number().optional(), // 系列内排序；不写则按文件名
+    lecture: z.union([z.number(), z.string()]).optional(), // 对应课程第几讲
+    course: z.string().optional(),
+    textbook: z.string().optional(), // 教材章节
   }),
 });
 
