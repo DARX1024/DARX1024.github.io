@@ -1,0 +1,83 @@
+---
+import Base from '../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { SITE } from '../site.config';
+import { getPosts, getSeries, titleOf, fmtDate } from '../lib/content';
+
+const posts = (await getPosts()).slice(0, 6);
+const series = await getSeries();
+const viz = (await getCollection('viz')).slice(0, 4);
+---
+
+<Base>
+  <section class="intro">
+    <h1 class="page-title">{SITE.title}</h1>
+    <p class="page-lede">{SITE.description}</p>
+  </section>
+
+  {
+    posts.length > 0 && (
+      <>
+        <h2 class="section-label">
+          最近的文章 <a href="/blog/">全部 →</a>
+        </h2>
+        <ul class="entry-list">
+          {posts.map((p) => (
+            <li>
+              <time datetime={p.data.date?.toISOString()}>{fmtDate(p.data.date)}</time>
+              <a href={`/blog/${p.id}/`}>
+                {titleOf(p)}
+                {!p.data.publish && <span class="badge draft">草稿</span>}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </>
+    )
+  }
+
+  {
+    series.length > 0 && (
+      <>
+        <h2 class="section-label">
+          笔记系列 <a href="/notes/">全部 →</a>
+        </h2>
+        <ul class="entry-list">
+          {series.map((s) => (
+            <li>
+              <span class="meta">{s.notes.length} 篇</span>
+              <a href={`/notes/${s.id}/`}>{s.title}</a>
+            </li>
+          ))}
+        </ul>
+      </>
+    )
+  }
+
+  {
+    viz.length > 0 && (
+      <>
+        <h2 class="section-label">
+          交互可视化 <a href="/viz/">全部 →</a>
+        </h2>
+        <div class="card-grid">
+          {viz.map((v) => (
+            <a class="card" href={`/viz/${v.id}/`}>
+              <h3>{v.data.title}</h3>
+              {v.data.description && <p>{v.data.description}</p>}
+            </a>
+          ))}
+        </div>
+      </>
+    )
+  }
+</Base>
+
+<style>
+  .intro {
+    margin-bottom: 1rem;
+  }
+  .section-label:first-of-type {
+    margin-top: 3rem;
+  }
+</style>

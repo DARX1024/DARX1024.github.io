@@ -1,0 +1,29 @@
+---
+// 在 MDX 里嵌入可视化：<Viz name="fourier-series" height={480} caption="……" />
+// 在普通 .md / Obsidian 里直接写 ![[fourier-series.html]] 即可，效果相同。
+import { getEntry } from 'astro:content';
+
+interface Props {
+  name: string;
+  height?: number;
+  caption?: string;
+}
+const { name, caption } = Astro.props;
+const id = name.replace(/(\/index)?\.html$/i, '').toLowerCase();
+const entry = await getEntry('viz', id);
+if (!entry) throw new Error(`[Viz] 找不到可视化 "${name}"，请检查 viz-raw/ 下是否有对应文件`);
+const height = Astro.props.height ?? entry.data.height;
+---
+
+<figure class="viz">
+  <iframe
+    class="viz-frame"
+    src={`/viz-raw/${entry.data.file}`}
+    title={caption ?? entry.data.title}
+    loading="lazy"
+    style={height ? `height:${height}px` : undefined}
+    data-autoheight={height ? undefined : ''}></iframe>
+  <figcaption>
+    {caption && <>{caption} · </>}<a href={`/viz/${id}/`}>单独打开 ↗</a>
+  </figcaption>
+</figure>

@@ -1,0 +1,32 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getPosts, titleOf, fmtDate } from '../../lib/content';
+
+const posts = await getPosts();
+const byYear = Map.groupBy(posts, (p) => p.data.date?.getUTCFullYear() ?? '未注明日期');
+---
+
+<Base title="博客" description="长文">
+  <h1 class="page-title">博客</h1>
+  <p class="page-lede">较完整的长文。</p>
+  {
+    [...byYear].map(([year, list]) => (
+      <section>
+        <h2 class="year">{year}</h2>
+        <ul class="entry-list">
+          {list.map((p) => (
+            <li>
+              <time datetime={p.data.date?.toISOString()}>{fmtDate(p.data.date).slice(5)}</time>
+              <a href={`/blog/${p.id}/`}>
+                {titleOf(p)}
+                {!p.data.publish && <span class="badge draft">草稿</span>}
+              </a>
+              {p.data.description && <span class="desc">{p.data.description}</span>}
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))
+  }
+  {posts.length === 0 && <p class="muted">还没有文章。</p>}
+</Base>

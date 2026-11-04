@@ -1,0 +1,391 @@
+/* ===========================================================
+   设计令牌
+   =========================================================== */
+:root {
+  /* 字体：只用系统字体，不加载任何中文 webfont。
+     西文字体放在前面，中文字符自动回落到后面的中文字体。 */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'Inter', Roboto, Arial,
+    'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Microsoft YaHei UI',
+    'Microsoft YaHei', 'WenQuanYi Micro Hei', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Source Serif 4', 'Source Serif Pro', Georgia,
+    'Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', STSong, serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, 'Liberation Mono',
+    'PingFang SC', 'Microsoft YaHei', monospace;
+
+  --font-body: var(--font-sans); /* 想要衬线正文就改成 var(--font-serif) */
+
+  --measure: 40rem; /* 正文行宽：约 38 个汉字 / 75 个英文字符 */
+  --wide: 56rem;
+  --gutter: clamp(1rem, 5vw, 2rem);
+
+  --bg: #fcfcfa;
+  --bg-soft: #f4f3ef;
+  --fg: #23221f;
+  --fg-soft: #4a4843;
+  --muted: #85827b;
+  --border: #e5e3dd;
+  --accent: #2f5d8a;
+  --accent-soft: rgba(47, 93, 138, 0.1);
+  --mark: rgba(255, 214, 102, 0.45);
+  --selection: rgba(47, 93, 138, 0.18);
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #17181b;
+  --bg-soft: #1f2024;
+  --fg: #dddad3;
+  --fg-soft: #b9b6ae;
+  --muted: #85837d;
+  --border: #2d2e33;
+  --accent: #8db4dc;
+  --accent-soft: rgba(141, 180, 220, 0.12);
+  --mark: rgba(255, 200, 80, 0.25);
+  --selection: rgba(141, 180, 220, 0.25);
+
+  color-scheme: dark;
+}
+
+/* ===========================================================
+   基础
+   =========================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-padding-top: 2rem;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 1.0625rem; /* 17px */
+  line-height: 1.8;
+  font-kerning: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* 中西文之间自动留出约 1/8 em 的间隙（新版 Chrome/Safari），不需要手动打空格 */
+  text-autospace: normal;
+  /* 行首、相邻全角标点挤压 */
+  text-spacing-trim: normal;
+  line-break: strict;
+  overflow-wrap: break-word;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+a {
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-color: var(--border);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+  transition: text-decoration-color 0.15s, color 0.15s;
+}
+a:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+img,
+svg,
+video,
+iframe {
+  max-width: 100%;
+}
+img {
+  height: auto;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.container {
+  width: 100%;
+  max-width: calc(var(--measure) + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+.container.wide {
+  max-width: calc(var(--wide) + 2 * var(--gutter));
+}
+
+.muted {
+  color: var(--muted);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* ===========================================================
+   页头 / 页脚
+   =========================================================== */
+.site-header {
+  padding-block: 2rem 0;
+}
+.site-header .container {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.site-title {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  margin-right: auto;
+}
+.site-nav {
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.9375rem;
+  align-items: baseline;
+}
+.site-nav a {
+  text-decoration: none;
+  color: var(--muted);
+}
+.site-nav a:hover,
+.site-nav a[aria-current='page'] {
+  color: var(--fg);
+}
+.theme-toggle {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  margin: -0.25rem;
+  line-height: 0;
+  align-self: center;
+}
+.theme-toggle:hover {
+  color: var(--fg);
+}
+.theme-toggle .moon,
+:root[data-theme='dark'] .theme-toggle .sun {
+  display: none;
+}
+:root[data-theme='dark'] .theme-toggle .moon {
+  display: block;
+}
+
+main {
+  padding-block: 3.5rem 5rem;
+}
+
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding-block: 2rem 3rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.site-footer .container {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+.site-footer .spacer {
+  margin-right: auto;
+}
+
+/* ===========================================================
+   列表页
+   =========================================================== */
+.page-title {
+  font-size: 1.75rem;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 0 0 0.5rem;
+}
+.page-lede {
+  color: var(--fg-soft);
+  margin: 0 0 3rem;
+}
+.section-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 3.5rem 0 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.section-label a {
+  text-transform: none;
+  letter-spacing: 0;
+  text-decoration: none;
+}
+
+.entry-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.entry-list li {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0 1rem;
+  padding-block: 0.45rem;
+}
+.entry-list time,
+.entry-list .meta {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  padding-top: 0.12em;
+}
+.entry-list a {
+  text-decoration: none;
+}
+.entry-list .desc {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+.entry-list.compact li {
+  grid-template-columns: 2.5rem 1fr;
+}
+@media (max-width: 34rem) {
+  .entry-list li {
+    grid-template-columns: 1fr;
+  }
+  .entry-list .desc {
+    grid-column: 1;
+  }
+  .entry-list.compact li {
+    grid-template-columns: 2rem 1fr;
+  }
+  .entry-list.compact .desc {
+    grid-column: 2;
+  }
+}
+
+.year {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin: 2.5rem 0 0.5rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+.card {
+  display: block;
+  padding: 1.1rem 1.2rem 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.card:hover {
+  border-color: var(--muted);
+  color: inherit;
+}
+.card h3 {
+  font-size: 1rem;
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.card p {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.65;
+}
+.card .meta {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-top: 0.75rem;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  padding: 0 0.45em;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  vertical-align: 0.12em;
+  margin-left: 0.4em;
+  font-weight: 400;
+}
+.badge.draft {
+  border-color: #d9a441;
+  color: #b27c14;
+}
+
+.tags {
+  display: inline-flex;
+  gap: 0.6em;
+  flex-wrap: wrap;
+}
+.tags span::before {
+  content: '#';
+  opacity: 0.6;
+}
+
+/* 上一篇 / 下一篇 */
+  .pager {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.9375rem;
+  }
+  .pager a {
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    line-height: 1.5;
+  }
+  .pager a span {
+    color: var(--muted);
+    font-size: 0.8125rem;
+  }
+  .pager .next {
+    text-align: right;
+    grid-column: 2;
+  }
+

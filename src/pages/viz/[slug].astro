@@ -1,0 +1,49 @@
+---
+import '../../styles/prose.css';
+import Base from '../../layouts/Base.astro';
+import { getCollection, type CollectionEntry } from 'astro:content';
+import { fmtDate } from '../../lib/content';
+
+export async function getStaticPaths() {
+  return (await getCollection('viz')).map((v) => ({ params: { slug: v.id }, props: { v } }));
+}
+const { v } = Astro.props as { v: CollectionEntry<'viz'> };
+const src = `/viz-raw/${v.data.file}`;
+---
+
+<Base title={v.data.title} description={v.data.description} wide>
+  <p class="kicker"><a href="/viz/">可视化</a></p>
+  <h1 class="page-title">{v.data.title}</h1>
+  {v.data.description && <p class="lede">{v.data.description}</p>}
+  <iframe
+    class="viz-frame"
+    src={src}
+    title={v.data.title}
+    style={v.data.height ? `height:${v.data.height}px` : undefined}
+    data-autoheight={v.data.height ? undefined : ''}></iframe>
+  <p class="foot muted num">
+    {fmtDate(v.data.date)}
+    {v.data.tags.length > 0 && ` · ${v.data.tags.join(' · ')}`}
+    {' · '}<a href={src}>全屏打开原始页面 ↗</a>
+  </p>
+</Base>
+
+<style>
+  .kicker {
+    font-size: 0.875rem;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  .kicker a {
+    text-decoration: none;
+  }
+  .lede {
+    color: var(--fg-soft);
+    margin: 0 0 2rem;
+    max-width: var(--measure);
+  }
+  .foot {
+    font-size: 0.875rem;
+    margin-top: 1rem;
+  }
+</style>

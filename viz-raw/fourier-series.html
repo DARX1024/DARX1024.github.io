@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方波的傅里叶级数</title>
+<meta name="description" content="拖动滑块增加谐波数，观察部分和如何逼近方波，以及跳变处始终存在的 Gibbs 过冲。">
+<meta name="viz:date" content="2026-10-27">
+<meta name="viz:tags" content="信号与系统, 傅里叶">
+<style>
+  /* 独立打开时跟随系统主题；嵌入站点时，站点会给 <html> 设置 data-theme */
+  :root { --bg:#fcfcfa; --fg:#23221f; --muted:#85827b; --grid:#e5e3dd; --a:#2f5d8a; --b:#c46a1b; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#17181b; --fg:#dddad3; --muted:#85837d; --grid:#2d2e33; --a:#8db4dc; --b:#e0a46a; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg:#17181b; --fg:#dddad3; --muted:#85837d; --grid:#2d2e33; --a:#8db4dc; --b:#e0a46a; color-scheme: dark; }
+  html, body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .wrap { padding:16px 20px 20px; max-width:880px; margin:0 auto; }
+  canvas { width:100%; height:260px; display:block; }
+  .ctl { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:10px; font-size:14px; color:var(--muted); }
+  input[type=range] { flex:1; min-width:160px; accent-color:var(--a); }
+  b { color:var(--fg); font-variant-numeric:tabular-nums; font-weight:600; }
+  .k { display:inline-block; width:10px; height:2px; vertical-align:middle; margin-right:4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="c"></canvas>
+  <div class="ctl">
+    <label for="n">谐波数 N = <b id="nv">5</b></label>
+    <input id="n" type="range" min="1" max="60" value="5">
+    <span><i class="k" style="background:var(--muted)"></i>方波</span>
+    <span><i class="k" style="background:var(--a)"></i>部分和</span>
+    <span>最大过冲 <b id="ov"></b></span>
+  </div>
+</div>
+<script>
+  const c = document.getElementById('c'), ctx = c.getContext('2d');
+  const n = document.getElementById('n');
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const partial = (x, N) => { let s = 0; for (let k = 1; k <= N; k++) { const m = 2*k-1; s += Math.sin(m*x)/m; } return 4/Math.PI*s; };
+  function draw() {
+    const N = +n.value, dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+    c.width = W*dpr; c.height = H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,W,H);
+    const X = (x) => (x + Math.PI) / (3*Math.PI) * W, Y = (y) => H/2 - y * H * 0.36;
+    ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, Y(0)); ctx.lineTo(W, Y(0)); ctx.stroke();
+    ctx.strokeStyle = css('--muted'); ctx.lineWidth = 1.2; ctx.setLineDash([4,4]); ctx.beginPath();
+    for (let i = 0; i <= W; i++) { const x = i/W*3*Math.PI - Math.PI; const y = Math.sign(Math.sin(x)); i ? ctx.lineTo(i, Y(y)) : ctx.moveTo(i, Y(y)); }
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = css('--a'); ctx.lineWidth = 2; ctx.beginPath();
+    let mx = 0;
+    for (let i = 0; i <= W*2; i++) { const x = i/(W*2)*3*Math.PI - Math.PI; const y = partial(x, N); mx = Math.max(mx, y); i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y)); }
+    ctx.stroke();
+    document.getElementById('nv').textContent = N;
+    document.getElementById('ov').textContent = ((mx - 1) * 100).toFixed(1) + '%';
+  }
+  n.addEventListener('input', draw); addEventListener('resize', draw);
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  draw();
+</script>
+</body>
+</html>

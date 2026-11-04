@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" font-family="system-ui, sans-serif">
+  <rect width="640" height="260" fill="#f4f3ef"/>
+  <g stroke="#2f5d8a" stroke-width="1.6" fill="none" stroke-linecap="round">
+    <path d="M20 220 C 160 220, 200 40, 320 40 S 480 220, 620 220"/>
+  </g>
+  <g fill="#c46a1b">
+    <circle cx="140" cy="200" r="4"/><circle cx="230" cy="110" r="4"/><circle cx="410" cy="110" r="4"/><circle cx="500" cy="200" r="4"/>
+  </g>
+  <g stroke="#c46a1b" stroke-width="1.4">
+    <path d="M140 200 l 28 -18"/><path d="M230 110 l 26 -24"/><path d="M410 110 l -26 -24"/><path d="M500 200 l -28 -18"/>
+  </g>
+  <text x="320" y="30" text-anchor="middle" font-size="13" fill="#4a4843">p(x)</text>
+  <text x="320" y="248" text-anchor="middle" font-size="12" fill="#85827b">score ∇ log p(x) 指向密度更高的方向</text>
+</svg>

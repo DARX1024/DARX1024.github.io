@@ -1,0 +1,65 @@
+---
+import { render } from 'astro:content';
+import Article from '../../layouts/Article.astro';
+import Viz from '../../components/Viz.astro';
+import { getNotes, getSeries, seriesIdOf, titleOf, readingMinutes, type Note, type Series } from '../../lib/content';
+
+export async function getStaticPaths() {
+  const [notes, series] = await Promise.all([getNotes(), getSeries()]);
+  return notes.map((note) => {
+    const s = series.find((x) => x.id === seriesIdOf(note));
+    const i = s ? s.notes.findIndex((n) => n.id === note.id) : -1;
+    return {
+      params: { slug: note.id },
+      props: { note, series: s, index: i, prev: s?.notes[i - 1], next: s?.notes[i + 1] },
+    };
+  });
+}
+
+interface Props {
+  note: Note;
+  series?: Series;
+  index: number;
+  prev?: Note;
+  next?: Note;
+}
+const { note, series, index, prev, next } = Astro.props;
+const { Content, headings } = await render(note);
+---
+
+<Article
+  title={titleOf(note)}
+  description={note.data.description}
+  date={note.data.date}
+  updated={note.data.updated}
+  tags={note.data.tags}
+  minutes={readingMinutes(note.body)}
+  draft={!note.data.publish}
+  headings={headings}
+  showToc={note.data.toc}
+>
+  <p slot="kicker" class="kicker">
+    <a href="/notes/">笔记</a>
+    {series && <> / <a href={`/notes/${series.id}/`}>{series.title}</a> <span class="num">· {index + 1}/{series.notes.length}</span></>}
+  </p>
+  <Content components={{ Viz }} />
+  {
+    series && (
+      <nav slot="after" class="pager">
+        {prev ? <a href={`/notes/${prev.id}/`}><span>← 上一篇</span>{titleOf(prev)}</a> : <span />}
+        {next && <a class="next" href={`/notes/${next.id}/`}><span>下一篇 →</span>{titleOf(next)}</a>}
+      </nav>
+    )
+  }
+</Article>
+
+<style>
+  .kicker {
+    font-size: 0.875rem;
+    color: var(--muted);
+    margin: 0 0 0.6rem;
+  }
+  .kicker a {
+    text-decoration: none;
+  }
+</style>

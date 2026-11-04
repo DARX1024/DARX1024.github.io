@@ -1,0 +1,53 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getNotes, getSeries, seriesIdOf, titleOf, fmtDate } from '../../lib/content';
+
+const series = await getSeries();
+const loose = (await getNotes())
+  .filter((n) => !seriesIdOf(n))
+  .sort((a, b) => (b.data.date?.valueOf() ?? 0) - (a.data.date?.valueOf() ?? 0));
+---
+
+<Base title="笔记" description="课程与论文笔记">
+  <h1 class="page-title">笔记</h1>
+  <p class="page-lede">课程与论文笔记。比博客更零散，会持续修改。</p>
+
+  {
+    series.length > 0 && (
+      <>
+        <h2 class="section-label">系列</h2>
+        <div class="card-grid">
+          {series.map((s) => (
+            <a class="card" href={`/notes/${s.id}/`}>
+              <h3>{s.title}</h3>
+              {s.description && <p>{s.description}</p>}
+              <div class="meta num">
+                {s.notes.length} 篇{s.updated && ` · 更新于 ${fmtDate(s.updated)}`}
+              </div>
+            </a>
+          ))}
+        </div>
+      </>
+    )
+  }
+
+  {
+    loose.length > 0 && (
+      <>
+        <h2 class="section-label">单篇</h2>
+        <ul class="entry-list">
+          {loose.map((n) => (
+            <li>
+              <time>{fmtDate(n.data.date)}</time>
+              <a href={`/notes/${n.id}/`}>
+                {titleOf(n)}
+                {!n.data.publish && <span class="badge draft">草稿</span>}
+              </a>
+              {n.data.description && <span class="desc">{n.data.description}</span>}
+            </li>
+          ))}
+        </ul>
+      </>
+    )
+  }
+</Base>

@@ -1,0 +1,44 @@
+---
+import { render } from 'astro:content';
+import Article from '../../layouts/Article.astro';
+import Viz from '../../components/Viz.astro';
+import { getPosts, titleOf, readingMinutes, type Post } from '../../lib/content';
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  return posts.map((post, i) => ({
+    params: { slug: post.id },
+    props: { post, newer: posts[i - 1], older: posts[i + 1] },
+  }));
+}
+
+interface Props {
+  post: Post;
+  newer?: Post;
+  older?: Post;
+}
+const { post, newer, older } = Astro.props;
+const { Content, headings } = await render(post);
+---
+
+<Article
+  title={titleOf(post)}
+  description={post.data.description}
+  date={post.data.date}
+  updated={post.data.updated}
+  tags={post.data.tags}
+  minutes={readingMinutes(post.body)}
+  draft={!post.data.publish}
+  headings={headings}
+  showToc={post.data.toc}
+>
+  <Content components={{ Viz }} />
+  {
+    (older || newer) && (
+      <nav slot="after" class="pager">
+        {older ? <a href={`/blog/${older.id}/`}><span>← 更早</span>{titleOf(older)}</a> : <span />}
+        {newer && <a class="next" href={`/blog/${newer.id}/`}><span>更新 →</span>{titleOf(newer)}</a>}
+      </nav>
+    )
+  }
+</Article>

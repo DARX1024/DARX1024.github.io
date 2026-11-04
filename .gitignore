@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.astro/
+# 由 viz-raw/ 自动复制生成
+public/viz-raw/
+# Obsidian 本地工作区状态（插件/主题设置想同步的话可以去掉这一行）
+src/content/.obsidian/workspace*.json
+src/content/.obsidian/plugins/
+src/content/.obsidian/themes/
+.DS_Store

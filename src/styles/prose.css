@@ -1,0 +1,324 @@
+/* ===========================================================
+   正文排版（博客、笔记、关于页共用）
+   =========================================================== */
+.prose > :first-child {
+  margin-top: 0;
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose blockquote,
+.prose pre,
+.prose table,
+.prose figure,
+.prose .callout,
+.prose .katex-display {
+  margin-block: 0 1.25em;
+}
+
+.prose h2,
+.prose h3,
+.prose h4 {
+  line-height: 1.45;
+  font-weight: 600;
+  letter-spacing: -0.003em;
+  scroll-margin-top: 2rem;
+}
+.prose h2 {
+  font-size: 1.35em;
+  margin: 2.4em 0 0.8em;
+}
+.prose h3 {
+  font-size: 1.12em;
+  margin: 2em 0 0.6em;
+}
+.prose h4 {
+  font-size: 1em;
+  margin: 1.75em 0 0.5em;
+}
+.prose h2 + h3 {
+  margin-top: 1em;
+}
+
+.prose strong {
+  font-weight: 600;
+}
+
+/* 中文不适合斜体（会被机械倾斜），强调用着重号；英文仍用斜体 */
+.prose em {
+  font-style: normal;
+  text-emphasis: filled dot;
+  -webkit-text-emphasis: filled dot;
+  text-emphasis-position: under right;
+  -webkit-text-emphasis-position: under right;
+}
+.prose em:lang(en),
+.prose :lang(en) em {
+  font-style: italic;
+  text-emphasis: none;
+  -webkit-text-emphasis: none;
+}
+
+.prose mark {
+  background: var(--mark);
+  color: inherit;
+  padding: 0.05em 0.15em;
+  border-radius: 2px;
+}
+
+.prose a {
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.prose a.wikilink {
+  text-decoration-style: dotted;
+}
+.prose .wikilink.is-missing {
+  color: var(--muted);
+  cursor: help;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.5em;
+}
+.prose li {
+  margin-block: 0.3em;
+}
+.prose li > ul,
+.prose li > ol {
+  margin-block: 0.3em;
+}
+.prose li::marker {
+  color: var(--muted);
+}
+.prose ul.contains-task-list {
+  list-style: none;
+  padding-left: 0.25em;
+}
+.prose .task-list-item input {
+  margin: 0 0.5em 0 0;
+  vertical-align: -0.1em;
+  accent-color: var(--accent);
+}
+
+.prose blockquote {
+  margin-inline: 0;
+  padding: 0.1em 0 0.1em 1.1em;
+  border-left: 2px solid var(--border);
+  color: var(--fg-soft);
+}
+.prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.prose hr {
+  border: 0;
+  margin: 3em auto;
+  width: 4rem;
+  border-top: 1px solid var(--border);
+}
+
+.prose img {
+  display: block;
+  margin-inline: auto;
+  border-radius: 4px;
+}
+.prose figure {
+  margin-inline: 0;
+}
+.prose figcaption {
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 0.6em;
+}
+
+/* 表格：窄屏可横向滚动 */
+.prose table {
+  display: block;
+  max-width: 100%;
+  width: max-content;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9375em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+}
+.prose th,
+.prose td {
+  padding: 0.45em 0.9em;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.prose th {
+  font-weight: 600;
+  border-bottom-color: var(--muted);
+}
+.prose thead th {
+  white-space: nowrap;
+}
+
+/* ---------- 代码 ---------- */
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+.prose :not(pre) > code {
+  background: var(--bg-soft);
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+.prose pre {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  padding: 1em 1.2em;
+  border-radius: 6px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  tab-size: 4;
+}
+.prose pre code {
+  font-size: inherit;
+}
+/* Shiki 双主题：用 CSS 变量切换 */
+.astro-code,
+.astro-code span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+.astro-code {
+  background-color: var(--bg-soft) !important;
+}
+:root[data-theme='dark'] .astro-code,
+:root[data-theme='dark'] .astro-code span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+:root[data-theme='dark'] .astro-code {
+  background-color: var(--bg-soft) !important;
+}
+.astro-code span {
+  background-color: transparent !important;
+}
+
+/* ---------- 公式 ---------- */
+.prose .katex {
+  font-size: 1.08em;
+}
+.prose .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.2em;
+}
+.prose .katex-display > .katex {
+  font-size: 1.12em;
+}
+
+/* ---------- 脚注 ---------- */
+.prose sup a[data-footnote-ref] {
+  text-decoration: none;
+  color: var(--accent);
+  padding-inline: 0.1em;
+}
+.prose .footnotes {
+  margin-top: 4rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+  color: var(--fg-soft);
+}
+.prose .footnotes ol {
+  padding-left: 1.2em;
+}
+
+/* ---------- Callout ---------- */
+.callout {
+  --c: var(--accent);
+  border-left: 3px solid var(--c);
+  background: color-mix(in srgb, var(--c) 6%, transparent);
+  border-radius: 0 6px 6px 0;
+  padding: 0.75em 1.1em;
+}
+.callout[data-callout-group='abstract'] { --c: #2a8c8c; }
+.callout[data-callout-group='tip'] { --c: #2f8f5b; }
+.callout[data-callout-group='success'] { --c: #2f8f5b; }
+.callout[data-callout-group='question'] { --c: #b07d1a; }
+.callout[data-callout-group='warning'] { --c: #c46a1b; }
+.callout[data-callout-group='danger'] { --c: #c0392b; }
+.callout[data-callout-group='example'] { --c: #7357b5; }
+.callout[data-callout-group='quote'] { --c: var(--muted); }
+.callout[data-callout-group='math'] { --c: var(--fg-soft); }
+:root[data-theme='dark'] .callout {
+  background: color-mix(in srgb, var(--c) 10%, transparent);
+}
+.callout-title {
+  font-weight: 600;
+  color: var(--c);
+  font-size: 0.9375em;
+}
+.callout[data-callout-group='math'] .callout-title,
+.callout[data-callout-group='quote'] .callout-title {
+  color: var(--fg);
+}
+.callout-content {
+  margin-top: 0.4em;
+  font-size: 0.96875em;
+}
+.callout-content > :last-child {
+  margin-bottom: 0;
+}
+/* 证明不用底色，只在末尾放 ∎ */
+.callout[data-callout='proof'] {
+  background: none;
+  border-left-width: 1px;
+}
+.callout[data-callout='proof'] .callout-content > :last-child::after {
+  content: ' ∎';
+  color: var(--muted);
+}
+details.callout > summary {
+  cursor: pointer;
+  list-style: none;
+}
+details.callout > summary::-webkit-details-marker {
+  display: none;
+}
+details.callout > summary::after {
+  content: '›';
+  display: inline-block;
+  margin-left: 0.5em;
+  transition: transform 0.15s;
+}
+details.callout[open] > summary::after {
+  transform: rotate(90deg);
+}
+
+/* ---------- 嵌入的可视化 ---------- */
+.prose figure.viz {
+  margin-block: 2em;
+}
+.viz-frame {
+  display: block;
+  width: 100%;
+  height: 420px;
+  min-height: 160px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+figure.viz figcaption a {
+  color: var(--muted);
+  text-decoration: none;
+}
+figure.viz figcaption a:hover {
+  color: var(--accent);
+}
+/* 宽屏下可视化可以比正文更宽一点 */
+@media (min-width: 64rem) {
+  .prose figure.viz {
+    margin-inline: -4rem;
+  }
+}

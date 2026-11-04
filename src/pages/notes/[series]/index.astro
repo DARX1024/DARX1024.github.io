@@ -1,0 +1,40 @@
+---
+import Base from '../../../layouts/Base.astro';
+import { getSeries, titleOf, type Series } from '../../../lib/content';
+
+export async function getStaticPaths() {
+  return (await getSeries()).map((s) => ({ params: { series: s.id }, props: { s } }));
+}
+const { s } = Astro.props as { s: Series };
+---
+
+<Base title={s.title} description={s.description}>
+  <p class="kicker"><a href="/notes/">笔记</a> / 系列</p>
+  <h1 class="page-title">{s.title}</h1>
+  {s.description && <p class="page-lede">{s.description}{s.url && <> · <a href={s.url}>课程主页</a></>}</p>}
+  <ol class="entry-list compact">
+    {
+      s.notes.map((n, i) => (
+        <li>
+          <span class="meta">{String(i + 1).padStart(2, '0')}</span>
+          <a href={`/notes/${n.id}/`}>
+            {titleOf(n)}
+            {!n.data.publish && <span class="badge draft">草稿</span>}
+          </a>
+          {n.data.description && <span class="desc">{n.data.description}</span>}
+        </li>
+      ))
+    }
+  </ol>
+</Base>
+
+<style>
+  .kicker {
+    font-size: 0.875rem;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  .kicker a {
+    text-decoration: none;
+  }
+</style>

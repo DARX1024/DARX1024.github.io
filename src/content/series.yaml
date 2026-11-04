@@ -1,0 +1,5 @@
+# 笔记系列：键名 = notes/ 下文件夹名（小写、空格换成 -）
+mit-6003:
+  title: MIT 6.003 信号与系统
+  description: Signals and Systems 课程笔记：从离散系统、卷积到傅里叶分析。
+  url: https://ocw.mit.edu/courses/6-003-signals-and-systems-fall-2011/
