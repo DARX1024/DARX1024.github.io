@@ -1,0 +1,104 @@
+---
+// 可视化卡片：有缩略图（npm run thumbs 生成）就显示图，没有就显示标题排版的封面
+import type { CollectionEntry } from 'astro:content';
+import { fmtDate } from '../lib/content';
+
+interface Props {
+  v: CollectionEntry<'viz'>;
+  meta?: boolean;
+}
+const { v, meta = false } = Astro.props;
+---
+
+<a class="viz-card" href={`/viz/${v.id}/`}>
+  <span class="viz-preview">
+    {
+      v.data.thumb ? (
+        <img src={`/viz-raw/${v.data.thumb}`} alt="" loading="lazy" decoding="async" />
+      ) : (
+        <span class="viz-cover" aria-hidden="true">{v.data.title}</span>
+      )
+    }
+  </span>
+  <span class="viz-card-body">
+    <span class="viz-card-title">{v.data.title}</span>
+    {v.data.description && <span class="viz-card-desc">{v.data.description}</span>}
+    {
+      meta && (
+        <span class="viz-card-meta">
+          {fmtDate(v.data.date)}
+          {v.data.tags.length > 0 && ` · ${v.data.tags.join(' · ')}`}
+        </span>
+      )
+    }
+  </span>
+</a>
+
+<style>
+  .viz-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    text-decoration: none;
+    background: var(--bg-soft);
+    transition: border-color 0.2s;
+  }
+  .viz-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    color: inherit;
+  }
+  .viz-preview {
+    display: block;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border);
+    background: #171513;
+  }
+  .viz-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    transition: transform 0.4s ease;
+  }
+  .viz-card:hover .viz-preview img {
+    transform: scale(1.03);
+  }
+  .viz-cover {
+    display: grid;
+    place-items: end start;
+    height: 100%;
+    padding: 1.2rem;
+    font-family: var(--font-heading);
+    font-size: 1.4rem;
+    color: var(--accent);
+    background: radial-gradient(120% 120% at 100% 0%, var(--accent-soft), transparent 60%);
+  }
+  .viz-card-body {
+    display: grid;
+    gap: 0.35rem;
+    padding: 1rem 1.2rem 1.15rem;
+  }
+  .viz-card-title {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1.0625rem;
+  }
+  .viz-card-desc {
+    font-size: 0.875rem;
+    color: var(--muted);
+    line-height: 1.65;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .viz-card-meta {
+    font-size: 0.8125rem;
+    color: var(--muted);
+    margin-top: 0.4rem;
+    font-variant-numeric: tabular-nums;
+  }
+</style>

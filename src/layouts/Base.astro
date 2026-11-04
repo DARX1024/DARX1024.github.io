@@ -39,9 +39,10 @@ const canonical = new URL(path, Astro.site);
     <slot name="head" />
   </head>
   <body>
+    <div class="read-progress" aria-hidden="true"></div>
     <header class="site-header">
-      <div class:list={['container', { wide }]}>
-        <a class="site-title" href="/">{SITE.title}</a>
+      <div class="container wide">
+        <a class="site-title" href="/"><span class="site-mark" aria-hidden="true"></span>{SITE.title}</a>
         <nav class="site-nav" aria-label="主导航">
           {
             NAV.map((n) => (
@@ -65,7 +66,7 @@ const canonical = new URL(path, Astro.site);
     </main>
 
     <footer class="site-footer">
-      <div class:list={['container', { wide }]}>
+      <div class="container wide">
         <span class="spacer">© {new Date().getFullYear()} {SITE.author}</span>
         <a href="/rss.xml">RSS</a>
         {SITE.github && <a href={SITE.github}>GitHub</a>}
@@ -75,6 +76,21 @@ const canonical = new URL(path, Astro.site);
 
     <script>
       const root = document.documentElement;
+
+      // ---- 页头：滚动后显示分隔线；文章页顶部阅读进度 ----
+      const header = document.querySelector('.site-header');
+      const bar = document.querySelector<HTMLElement>('.read-progress');
+      const article = document.querySelector('.article');
+      const onScroll = () => {
+        header?.classList.toggle('scrolled', scrollY > 8);
+        if (bar && article) {
+          const r = article.getBoundingClientRect();
+          const p = Math.min(1, Math.max(0, -r.top / Math.max(1, r.height - innerHeight)));
+          bar.style.transform = `scaleX(${p})`;
+        }
+      };
+      addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
 
       // ---- 主题切换 ----
       document.querySelector('.theme-toggle')?.addEventListener('click', () => {
@@ -86,10 +102,16 @@ const canonical = new URL(path, Astro.site);
 
       // ---- 可视化 iframe：同步主题 + 自动高度 ----
       // 可视化页面可以用 :root[data-theme="dark"] 写暗色样式；不写也没关系。
+      // 把网站当前配色以 --site-* 变量传进去；可视化可以用 :root[data-embedded] 接上（见 README）
+      const SITE_TOKENS = ['bg', 'bg-soft', 'fg', 'fg-soft', 'muted', 'border', 'accent', 'font-body', 'font-heading', 'font-mono'];
       function syncTheme(f: HTMLIFrameElement) {
         try {
-          const d = f.contentDocument;
-          if (d) d.documentElement.dataset.theme = root.dataset.theme;
+          const el = f.contentDocument?.documentElement;
+          if (!el) return;
+          const cs = getComputedStyle(root);
+          for (const t of SITE_TOKENS) el.style.setProperty(`--site-${t}`, cs.getPropertyValue(`--${t}`).trim());
+          el.dataset.embedded = '';
+          el.dataset.theme = root.dataset.theme;
         } catch {}
       }
       function fit(f: HTMLIFrameElement) {

@@ -19,7 +19,6 @@ const byYear = Map.groupBy(posts, (p) => p.data.date?.getUTCFullYear() ?? '未�
               <time datetime={p.data.date?.toISOString()}>{fmtDate(p.data.date).slice(5)}</time>
               <a href={`/blog/${p.id}/`}>
                 {titleOf(p)}
-                {!p.data.publish && <span class="badge draft">草稿</span>}
               </a>
               {p.data.description && <span class="desc">{p.data.description}</span>}
             </li>

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>复指数的螺旋与影子</title>
+<meta name="description" content="复指数在 (t, Re, Im) 空间里是一条螺旋，实部和虚部是它在地面和后墙上的两个影子。可以拖动旋转视角、反转旋转方向。">
+<meta name="viz:date" content="2026-11-03">
+<meta name="viz:tags" content="信号与系统, 复指数">
+<meta name="viz:thumb" content="#cv">
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1b1f2a; --muted:#5a6172; --line:#d3d7e0;
+  --vec:#5b4fc4; --re:#0e8366; --im:#c4512a;
+  --f-body:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12141a; --panel:#1a1d25; --ink:#e6e8ee; --muted:#9aa1b2; --line:#3a404d;
+  --vec:#a99cf5; --re:#3fcf9f; --im:#f08a63; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12141a; --panel:#1a1d25; --ink:#e6e8ee; --muted:#9aa1b2; --line:#3a404d;
+  --vec:#a99cf5; --re:#3fcf9f; --im:#f08a63; color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.7}
+.wrap{max-width:860px;margin:0 auto;padding:28px 16px 48px;display:flex;flex-direction:column;gap:14px}
+h1{font-size:24px;font-weight:600;margin:0}
+p{margin:0;max-width:66ch;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:5px 11px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--vec);outline-offset:2px}
+.row{display:flex;align-items:center;gap:12px;font-size:14px}
+.row label{color:var(--muted)}
+.row input{flex:1;accent-color:var(--vec)}
+.row output{min-width:44px;font-family:ui-monospace,Menlo,monospace;font-size:13px;text-align:right}
+/* 嵌入时标题和导语交给文章，只保留交互卡片 */
+:root[data-embedded] .wrap{padding:4px 2px}
+:root[data-embedded] .wrap>h1,:root[data-embedded] .wrap>p{display:none}
+canvas{width:100%;height:360px;display:block;border-radius:8px;background:var(--bg);touch-action:none;cursor:grab}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--muted)}
+.sw{display:inline-block;width:16px;height:3px;vertical-align:middle;margin-right:6px;border-radius:2px}
+
+/* 嵌入网站时：网站会给 <html> 加 data-embedded，并传入 --site-* 配色，这里接上，让页面与正文融为一体 */
+:root[data-embedded]{--bg:var(--site-bg);--panel:var(--site-bg-soft);--ink:var(--site-fg);--muted:var(--site-muted);--line:var(--site-border);--grid:var(--site-border);--f-body:var(--site-font-body);--f-head:var(--site-font-heading)}
+:root[data-embedded] body{background:transparent}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>复指数的螺旋与影子</h1>
+  <p>e<sup>st</sup> 在 (t, Re, Im) 三维空间里是一条螺旋。实部和虚部曲线是它在地面和后墙上的影子。拖动画面可以旋转视角。</p>
+  <div class="card">
+    <div class="btns">
+      <button type="button" data-v="0.55,-0.4">斜着看：螺旋</button>
+      <button type="button" data-v="1.5708,0">沿 t 轴看：复平面</button>
+      <button type="button" data-v="0,-1.5708">从上看：只剩实部</button>
+      <button type="button" data-v="0,0">从侧面看：只剩虚部</button>
+      <button type="button" id="flip">反转旋转方向（ω → −ω）</button>
+    </div>
+    <div class="row"><label for="sg">σ</label><input id="sg" type="range" min="-0.12" max="0.12" step="0.01" value="0"><output id="sgo">0.00</output></div>
+    <canvas id="cv"></canvas>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--vec)"></i>e<sup>st</sup> 本身</span>
+      <span><i class="sw" style="background:var(--re)"></i>实部的影子（地面）</span>
+      <span><i class="sw" style="background:var(--im)"></i>虚部的影子（后墙）</span>
+      <span id="dir"></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+const cv=document.getElementById('cv'),sg=document.getElementById('sg');
+let yaw=0.55,pitch=-0.4,sgn=1,anim=null;
+const L=6,w=1.5;
+const tok=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function draw(){
+  const r=cv.getBoundingClientRect(),d=window.devicePixelRatio||1;
+  cv.width=Math.round(r.width*d);cv.height=Math.round(r.height*d);
+  const x=cv.getContext('2d');x.setTransform(d,0,0,d,0,0);
+  const W=r.width,H=r.height,s=Math.min(W/4.4,H/3.7),cx=W/2,cy=H/2,sig=+sg.value;
+  document.getElementById('sgo').textContent=sig.toFixed(2);
+  const amax=Math.exp(Math.abs(sig)*L),K=1.3;
+  const cyw=Math.cos(yaw),syw=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+  const pr=(X,Y,Z)=>{const x1=X*cyw+Z*syw,z1=-X*syw+Z*cyw;const y2=Y*cp-z1*sp;return[cx+s*x1,cy-s*y2]};
+  const pt=t=>{const a=Math.exp(sig*t)/amax;return[t/L*1.8,a*sgn*Math.sin(w*t),a*Math.cos(w*t)]};
+  const N=600,ts=Array.from({length:N+1},(_,i)=>-L+2*L*i/N);
+  const line=(pts,col,lw)=>{x.strokeStyle=col;x.lineWidth=lw;x.beginPath();pts.forEach((p,i)=>{const q=pr(...p);i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1])});x.stroke()};
+  const bd=tok('--line');
+  line([[-1.8,-K,-K],[1.8,-K,-K],[1.8,-K,K],[-1.8,-K,K],[-1.8,-K,-K]],bd,1);
+  line([[-1.8,-K,-K],[-1.8,K,-K],[1.8,K,-K],[1.8,-K,-K]],bd,1);
+  line([[-1.8,0,0],[2.05,0,0]],tok('--muted'),1);
+  line(ts.map(t=>{const p=pt(t);return[p[0],-K,p[2]]}),tok('--re'),1.6);
+  line(ts.map(t=>{const p=pt(t);return[p[0],p[1],-K]}),tok('--im'),1.6);
+  line(ts.map(pt),tok('--vec'),2.2);
+  x.fillStyle=tok('--muted');x.font='12px sans-serif';
+  let q=pr(2.1,0,0);x.fillText('t',q[0],q[1]+4);
+  q=pr(1.8,-K,K);x.fillText('Re',q[0]+4,q[1]);
+  q=pr(-1.8,K,-K);x.fillText('Im',q[0]-18,q[1]);
+  document.getElementById('dir').textContent='当前 ω = '+(sgn>0?'+1.5（逆时针）':'−1.5（顺时针）');
+}
+function go(a,b){
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){yaw=a;pitch=b;draw();return}
+  cancelAnimationFrame(anim);const y0=yaw,p0=pitch,t0=performance.now();
+  const step=n=>{const k=Math.min(1,(n-t0)/450),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;yaw=y0+(a-y0)*e;pitch=p0+(b-p0)*e;draw();if(k<1)anim=requestAnimationFrame(step)};
+  anim=requestAnimationFrame(step);
+}
+document.querySelectorAll('[data-v]').forEach(b=>b.addEventListener('click',()=>{const[a,p]=b.dataset.v.split(',').map(Number);go(a,p)}));
+document.getElementById('flip').addEventListener('click',()=>{sgn=-sgn;draw()});
+sg.addEventListener('input',draw);
+let drag=null;
+cv.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY];cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(!drag)return;yaw+=(e.clientX-drag[0])*0.01;pitch=Math.max(-1.5708,Math.min(1.5708,pitch+(e.clientY-drag[1])*0.01));drag=[e.clientX,e.clientY];draw()});
+cv.addEventListener('pointerup',()=>drag=null);
+window.addEventListener('resize',draw);
+try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw)}catch(e){}
+new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme','data-embedded','style']});
+draw();
+})();
+</script>
+</body>
+</html>

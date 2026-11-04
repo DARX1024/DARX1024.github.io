@@ -1,83 +1,213 @@
 ---
 import Base from '../layouts/Base.astro';
+import VizCard from '../components/VizCard.astro';
 import { getCollection } from 'astro:content';
 import { SITE } from '../site.config';
-import { getPosts, getSeries, titleOf, fmtDate } from '../lib/content';
+import { getPosts, getNotes, getSeries, seriesIdOf, titleOf, fmtDate, fmtDateLong } from '../lib/content';
 
-const posts = (await getPosts()).slice(0, 6);
-const series = await getSeries();
-const viz = (await getCollection('viz')).slice(0, 4);
+// 博客和笔记合在一起按时间排，最新的一篇做成头条
+const [posts, notes, series] = await Promise.all([getPosts(), getNotes(), getSeries()]);
+const seriesTitle = (id?: string) => series.find((s) => s.id === id)?.title;
+const latest = [
+  ...posts.map((p) => ({ kind: '博客', href: `/blog/${p.id}/`, title: titleOf(p), desc: p.data.description, date: p.data.date, where: '' })),
+  ...notes.map((n) => ({ kind: '笔记', href: `/notes/${n.id}/`, title: titleOf(n), desc: n.data.description, date: n.data.date, where: seriesTitle(seriesIdOf(n)) ?? '' })),
+].sort((a, b) => (b.date?.valueOf() ?? 0) - (a.date?.valueOf() ?? 0));
+const [featured, ...rest] = latest;
+const viz = (await getCollection('viz')).sort((a, b) => (b.data.date?.valueOf() ?? 0) - (a.data.date?.valueOf() ?? 0)).slice(0, 4);
 ---
 
-<Base>
-  <section class="intro">
-    <h1 class="page-title">{SITE.title}</h1>
-    <p class="page-lede">{SITE.description}</p>
+<Base wide>
+  <section class="hero">
+    {SITE.tagline && <p class="eyebrow">{SITE.tagline}</p>}
+    <h1>{SITE.title}</h1>
+    <p class="bio">{SITE.description}</p>
+    <p class="links">
+      <a href="/about/">关于我</a>
+      {SITE.github && <a href={SITE.github}>GitHub</a>}
+      <a href="/rss.xml">RSS</a>
+    </p>
   </section>
 
   {
-    posts.length > 0 && (
-      <>
-        <h2 class="section-label">
-          最近的文章 <a href="/blog/">全部 →</a>
-        </h2>
-        <ul class="entry-list">
-          {posts.map((p) => (
-            <li>
-              <time datetime={p.data.date?.toISOString()}>{fmtDate(p.data.date)}</time>
-              <a href={`/blog/${p.id}/`}>
-                {titleOf(p)}
-                {!p.data.publish && <span class="badge draft">草稿</span>}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </>
+    featured && (
+      <section class="block">
+        <h2 class="block-label"><span>最新</span></h2>
+        <a class="featured" href={featured.href}>
+          <span class="featured-kicker">
+            {featured.kind}
+            {featured.where && <> · {featured.where}</>}
+            {featured.date && <> · {fmtDateLong(featured.date)}</>}
+          </span>
+          <span class="featured-title">{featured.title}</span>
+          {featured.desc && <span class="featured-desc">{featured.desc}</span>}
+          <span class="featured-more">阅读全文 →</span>
+        </a>
+      </section>
     )
   }
 
   {
-    series.length > 0 && (
-      <>
-        <h2 class="section-label">
-          笔记系列 <a href="/notes/">全部 →</a>
-        </h2>
+    rest.length > 0 && (
+      <section class="block">
+        <h2 class="block-label"><span>近期</span></h2>
         <ul class="entry-list">
-          {series.map((s) => (
+          {rest.slice(0, 6).map((e) => (
             <li>
-              <span class="meta">{s.notes.length} 篇</span>
-              <a href={`/notes/${s.id}/`}>{s.title}</a>
+              <time>{fmtDate(e.date)}</time>
+              <a href={e.href}>{e.title}</a>
+              <span class="desc">{e.kind}{e.where && ` · ${e.where}`}</span>
             </li>
           ))}
         </ul>
-      </>
+      </section>
     )
   }
 
   {
     viz.length > 0 && (
-      <>
-        <h2 class="section-label">
-          交互可视化 <a href="/viz/">全部 →</a>
+      <section class="block">
+        <h2 class="block-label">
+          <span>交互可视化</span>
+          <a href="/viz/">全部 →</a>
+        </h2>
+        <div class="viz-grid">
+          {viz.map((v) => <VizCard v={v} />)}
+        </div>
+      </section>
+    )
+  }
+
+  {
+    series.length > 0 && (
+      <section class="block">
+        <h2 class="block-label">
+          <span>笔记系列</span>
+          <a href="/notes/">全部 →</a>
         </h2>
         <div class="card-grid">
-          {viz.map((v) => (
-            <a class="card" href={`/viz/${v.id}/`}>
-              <h3>{v.data.title}</h3>
-              {v.data.description && <p>{v.data.description}</p>}
+          {series.map((s) => (
+            <a class="card" href={`/notes/${s.id}/`}>
+              <h3>{s.title}</h3>
+              {s.description && <p>{s.description}</p>}
+              <div class="meta num">
+                {s.notes.length} 篇{s.updated && ` · 更新于 ${fmtDate(s.updated)}`}
+              </div>
             </a>
           ))}
         </div>
-      </>
+      </section>
     )
   }
 </Base>
 
 <style>
-  .intro {
-    margin-bottom: 1rem;
+  .hero {
+    padding: 2.5rem 0 1rem;
+    max-width: 40rem;
   }
-  .section-label:first-of-type {
-    margin-top: 3rem;
+  .eyebrow {
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 1rem;
   }
+  .hero h1 {
+    font-size: clamp(2.6rem, 6vw, 3.6rem);
+    line-height: 1.05;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 1.25rem;
+  }
+  .bio {
+    font-size: 1.125rem;
+    line-height: 1.8;
+    color: var(--fg-soft);
+    margin: 0 0 1.5rem;
+  }
+  .links {
+    display: flex;
+    gap: 1.5rem;
+    margin: 0;
+    font-size: 0.9375rem;
+  }
+  .links a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .links a:hover {
+    color: var(--accent);
+  }
+
+  .block {
+    margin-top: 4.5rem;
+  }
+  .block-label {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin: 0 0 1.5rem;
+  }
+  .block-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    order: 1;
+  }
+  .block-label a {
+    order: 2;
+    letter-spacing: 0;
+    text-decoration: none;
+    font-weight: 400;
+  }
+
+  .featured {
+    display: grid;
+    gap: 0.75rem;
+    padding: 2rem 2.25rem 1.9rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background:
+      radial-gradient(120% 140% at 100% 0%, var(--accent-soft), transparent 55%),
+      var(--bg-soft);
+    text-decoration: none;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .featured:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    color: inherit;
+  }
+  .featured-kicker {
+    font-size: 0.8125rem;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+  }
+  .featured-title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+  .featured-desc {
+    color: var(--fg-soft);
+    max-width: 44rem;
+    line-height: 1.8;
+  }
+  .featured-more {
+    font-size: 0.875rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+    transition: color 0.2s;
+  }
+  .featured:hover .featured-more {
+    color: var(--accent);
+  }
+
 </style>

@@ -1,27 +1,16 @@
 ---
 import Base from '../../layouts/Base.astro';
+import VizCard from '../../components/VizCard.astro';
 import { getCollection } from 'astro:content';
-import { fmtDate } from '../../lib/content';
 
 const viz = (await getCollection('viz')).sort((a, b) => (b.data.date?.valueOf() ?? 0) - (a.data.date?.valueOf() ?? 0));
 ---
 
-<Base title="交互可视化" description="可以直接上手玩的小演示">
+<Base title="交互可视化" description="可以直接上手玩的小演示" wide>
   <h1 class="page-title">交互可视化</h1>
   <p class="page-lede">一些可以直接上手拖动的小演示。每个都可以嵌入文章，也可以单独打开。</p>
-  <div class="card-grid">
-    {
-      viz.map((v) => (
-        <a class="card" href={`/viz/${v.id}/`}>
-          <h3>{v.data.title}</h3>
-          {v.data.description && <p>{v.data.description}</p>}
-          <div class="meta num">
-            {fmtDate(v.data.date)}
-            {v.data.tags.length > 0 && ` · ${v.data.tags.join(' · ')}`}
-          </div>
-        </a>
-      ))
-    }
+  <div class="viz-grid">
+    {viz.map((v) => <VizCard v={v} meta />)}
   </div>
   {viz.length === 0 && <p class="muted">把 HTML 文件放进 viz-raw/ 就会出现在这里。</p>}
 </Base>

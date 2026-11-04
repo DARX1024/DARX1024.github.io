@@ -48,13 +48,13 @@ function findViz(file) {
   return v ? readVizMeta(v) : null;
 }
 
-export function vizNode(file, { height, caption } = {}, warn = () => {}) {
+export function vizNode(file, { height, caption, query = '' } = {}, warn = () => {}) {
   const meta = findViz(file);
   if (!meta) warn(`找不到可视化 ${file}（应放在 viz-raw/ 下）`);
   height ??= meta?.data.height;
   caption ||= meta?.data.title;
   const name = meta ? meta.id : file.replace(/(\/index)?\.html$/i, '');
-  const src = '/viz-raw/' + (meta ? meta.data.file : file.replace(/^\/+/, ''));
+  const src = '/viz-raw/' + (meta ? meta.data.file : file.replace(/^\/+/, '')) + query;
   const props = {
     className: ['viz-frame'],
     src,
@@ -156,7 +156,8 @@ function transformText(value, ctx) {
   return out;
 }
 
-const VIZ_LINE = /^\s*!\[\[([^\[\]|]+?\.html)(?:\|([^\]]*))?\]\]\s*$/i;
+// 可带查询参数，交给可视化页面自己解释：![[envelope-lab.html?lab=A]]
+const VIZ_LINE = /^\s*!\[\[([^\[\]|?]+?\.html)(\?[^\[\]|]*)?(?:\|([^\]]*))?\]\]\s*$/i;
 
 // ==高亮== 里含有公式、加粗等时，会跨越多个 AST 节点，这里先把它们配对包成 <mark>
 const OPEN = /==(?=\S)/;
@@ -186,9 +187,64 @@ function markAcross(node) {
   }
 }
 
+// Obsidian 把独占一段的 $$…$$（写在同一行，包括 callout 里的 > $$…$$）显示为行间公式，
+// remark-math 却把它当行内公式。这里按源码判断并改成块级公式。
+function displayMath(value) {
+  return {
+    type: 'math',
+    value,
+    data: {
+      hName: 'pre',
+      hChildren: [{ type: 'element', tagName: 'code', properties: { className: ['language-math', 'math-display'] }, children: [{ type: 'text', value }] }],
+    },
+  };
+}
+/** 把段落里「独占一行的 $$…$$」切出来变成块级公式，返回替换用的节点数组；没有则返回 null */
+function promoteDisplayMath(node, ctx) {
+  if (node.type !== 'paragraph' || !ctx.source) return null;
+  const kids = node.children;
+  const isDisplay = (k, j) => {
+    if (k.type !== 'inlineMath') return false;
+    const start = k.position?.start?.offset;
+    if (start == null || ctx.source.slice(start, start + 2) !== '$$') return false;
+    const prev = kids[j - 1], next = kids[j + 1];
+    const okPrev = !prev || prev.type === 'break' || (prev.type === 'text' && /(^|\n)[ \t]*$/.test(prev.value));
+    const okNext = !next || next.type === 'break' || (next.type === 'text' && /^[ \t]*(\n|$)/.test(next.value));
+    return okPrev && okNext;
+  };
+  if (!kids.some(isDisplay)) return null;
+  const out = [];
+  let buf = [];
+  const flush = () => {
+    // 去掉切口两侧的换行
+    if (buf.length && buf[0].type === 'text') buf[0] = { ...buf[0], value: buf[0].value.replace(/^\s*\n/, '') };
+    const last = buf.length - 1;
+    if (last >= 0 && buf[last].type === 'text') buf[last] = { ...buf[last], value: buf[last].value.replace(/\n\s*$/, '') };
+    while (buf.length && (buf[0].type === 'break' || (buf[0].type === 'text' && !buf[0].value.trim()))) buf.shift();
+    while (buf.length && (buf.at(-1).type === 'break' || (buf.at(-1).type === 'text' && !buf.at(-1).value.trim()))) buf.pop();
+    if (buf.length) out.push({ type: 'paragraph', children: buf });
+    buf = [];
+  };
+  kids.forEach((k, j) => {
+    if (isDisplay(k, j)) {
+      flush();
+      out.push(displayMath(k.value));
+    } else buf.push(k);
+  });
+  flush();
+  return out;
+}
+
 function walk(node, ctx) {
   if (!node.children) return;
   markAcross(node);
+  for (let i = 0; i < node.children.length; i++) {
+    const promoted = promoteDisplayMath(node.children[i], ctx);
+    if (promoted) {
+      node.children.splice(i, 1, ...promoted);
+      i += promoted.length - 1;
+    }
+  }
   for (let i = 0; i < node.children.length; i++) {
     const child = node.children[i];
     if (SKIP.has(child.type)) continue;
@@ -197,9 +253,9 @@ function walk(node, ctx) {
     if (child.type === 'paragraph' && child.children.length === 1 && child.children[0].type === 'text') {
       const m = VIZ_LINE.exec(child.children[0].value);
       if (m) {
-        const opt = (m[2] ?? '').trim();
+        const opt = (m[3] ?? '').trim();
         const height = /^\d+$/.test(opt) ? Number(opt) : undefined;
-        node.children[i] = vizNode(m[1].trim(), { height, caption: height ? '' : opt }, ctx.warn);
+        node.children[i] = vizNode(m[1].trim(), { height, caption: height ? '' : opt, query: m[2] ?? '' }, ctx.warn);
         continue;
       }
     }
@@ -236,6 +292,7 @@ export default function remarkObsidian() {
   return (tree, file) => {
     const ctx = {
       file: file.path,
+      source: String(file.value ?? ''),
       index: getIndex(),
       warn: (msg) => console.warn(`[obsidian] ${file.path ? path.relative(process.cwd(), file.path) : ''}: ${msg}`),
     };

@@ -19,7 +19,6 @@ const { s } = Astro.props as { s: Series };
           <span class="meta">{String(i + 1).padStart(2, '0')}</span>
           <a href={`/notes/${n.id}/`}>
             {titleOf(n)}
-            {!n.data.publish && <span class="badge draft">草稿</span>}
           </a>
           {n.data.description && <span class="desc">{n.data.description}</span>}
         </li>

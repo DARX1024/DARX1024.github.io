@@ -16,7 +16,7 @@ const base = {
   date: z.coerce.date().optional(),
   updated: z.coerce.date().optional(),
   tags,
-  publish: z.boolean().default(false), // 只有 publish: true 才会出现在构建产物里
+  publish: z.boolean().default(true), // 网站只做展示：默认发布，写 publish: false 可临时隐藏
   toc: z.boolean().default(true),
 };
 
@@ -55,6 +55,7 @@ const viz = defineCollection({
     date: z.coerce.date().optional(),
     tags: z.array(z.string()).default([]),
     height: z.number().optional(),
+    thumb: z.string().optional(),
     file: z.string(),
   }),
 });

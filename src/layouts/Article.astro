@@ -5,6 +5,19 @@ import '../styles/prose.css';
 import Base from './Base.astro';
 import type { MarkdownHeading } from 'astro';
 import { fmtDateLong } from '../lib/content';
+import katex from 'katex';
+
+// 目录文字里的 $…$ 渲染成公式（见 plugins/rehype-heading-math.mjs）
+const escapeHtml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const tocHtml = (text: string) =>
+  text
+    .split(/(\$[^$]+\$)/)
+    .map((part) =>
+      /^\$[^$]+\$$/.test(part)
+        ? katex.renderToString(part.slice(1, -1), { throwOnError: false, output: 'html' })
+        : escapeHtml(part),
+    )
+    .join('');
 
 interface Props {
   title: string;
@@ -13,11 +26,10 @@ interface Props {
   updated?: Date;
   tags?: string[];
   minutes?: number;
-  draft?: boolean;
   headings?: MarkdownHeading[];
   showToc?: boolean;
 }
-const { title, description, date, updated, tags = [], minutes, draft, headings = [], showToc = true } = Astro.props;
+const { title, description, date, updated, tags = [], minutes, headings = [], showToc = true } = Astro.props;
 const toc = headings.filter((h) => h.depth >= 2 && h.depth <= 3 && h.slug !== 'footnote-label');
 const hasToc = showToc && toc.length >= 3;
 ---
@@ -28,15 +40,14 @@ const hasToc = showToc && toc.length >= 3;
       <slot name="kicker" />
       <h1>
         {title}
-        {draft && <span class="badge draft">草稿 · 不会发布</span>}
       </h1>
       {description && <p class="article-desc">{description}</p>}
       <div class="article-meta">
         {date && <time datetime={date.toISOString()}>{fmtDateLong(date)}</time>}
         {updated && <span>更新于 {fmtDateLong(updated)}</span>}
         {minutes && <span>约 {minutes} 分钟</span>}
-        {tags.length > 0 && <span class="tags">{tags.map((t) => <span>{t}</span>)}</span>}
       </div>
+      {tags.length > 0 && <div class="tags article-tags">{tags.map((t) => <span>{t}</span>)}</div>}
     </header>
 
     {
@@ -47,7 +58,7 @@ const hasToc = showToc && toc.length >= 3;
           <ol>
             {toc.map((h) => (
               <li class={`d${h.depth}`}>
-                <a href={`#${h.slug}`}>{h.text}</a>
+                <a href={`#${h.slug}`} set:html={tocHtml(h.text)} />
               </li>
             ))}
           </ol>
@@ -66,28 +77,41 @@ const hasToc = showToc && toc.length >= 3;
 
 <style>
   .article-header {
-    margin-bottom: 3rem;
+    margin: 1rem 0 3.25rem;
+    padding-bottom: 2.25rem;
+    border-bottom: 1px solid var(--border);
   }
   h1 {
-    font-size: 1.9rem;
-    line-height: 1.35;
-    font-weight: 650;
-    letter-spacing: -0.01em;
-    margin: 0 0 0.6rem;
+    font-size: clamp(1.9rem, 4.2vw, 2.5rem);
+    line-height: 1.25;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 0 0 1rem;
     text-wrap: balance;
   }
   .article-desc {
     color: var(--fg-soft);
-    margin: 0 0 0.9rem;
-    font-size: 1.0625rem;
+    margin: 0 0 1.4rem;
+    font-size: 1.125rem;
+    line-height: 1.8;
   }
   .article-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem 1.1rem;
+    align-items: center;
+    gap: 0.4rem 0;
     color: var(--muted);
     font-size: 0.875rem;
     font-variant-numeric: tabular-nums;
+  }
+  .article-tags {
+    margin-top: 0.6rem;
+    font-size: 0.875rem;
+  }
+  .article-meta > * + *::before {
+    content: '·';
+    margin: 0 0.7rem;
+    opacity: 0.6;
   }
 
   /* 目录：宽屏固定在正文右侧，窄屏收在标题下方 */
@@ -130,18 +154,18 @@ const hasToc = showToc && toc.length >= 3;
     }
     .toc {
       position: absolute;
-      left: calc(100% + 3rem);
+      left: calc(100% + 5rem);
       top: 0;
       bottom: 0;
-      width: 13rem;
+      width: 11.5rem;
       margin: 0;
       padding: 0;
       border: 0;
     }
     .toc-inner {
       position: sticky;
-      top: 2rem;
-      max-height: calc(100vh - 4rem);
+      top: 6rem;
+      max-height: calc(100vh - 8rem);
       overflow-y: auto;
     }
   }

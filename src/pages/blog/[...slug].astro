@@ -28,7 +28,6 @@ const { Content, headings } = await render(post);
   updated={post.data.updated}
   tags={post.data.tags}
   minutes={readingMinutes(post.body)}
-  draft={!post.data.publish}
   headings={headings}
   showToc={post.data.toc}
 >

@@ -46,6 +46,8 @@ export function readVizMeta({ id, file }) {
       date: meta(html, 'viz:date') ?? fs.statSync(abs).mtime.toISOString().slice(0, 10),
       tags: meta(html, 'viz:tags')?.split(/[,，]\s*/).filter(Boolean) ?? [],
       height: Number(meta(html, 'viz:height')) || undefined,
+      // npm run thumbs 生成的缩略图
+      thumb: fs.existsSync(path.join(VIZ_SRC, '_thumbs', `${id}.jpg`)) ? `_thumbs/${id}.jpg` : undefined,
       file,
     },
   };

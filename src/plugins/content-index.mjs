@@ -35,8 +35,8 @@ export function readFrontmatter(file) {
   }
 }
 
-/** dev 下草稿也能预览；build 时只有 publish: true 才算数。 */
-export const isPublished = (data) => data.publish === true || process.env.NODE_ENV !== 'production';
+/** 和 content.config.ts 一致：默认发布，publish: false 隐藏 */
+export const isPublished = (data) => data.publish !== false;
 
 let cache = null;
 let cachedAt = 0;

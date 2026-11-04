@@ -3,8 +3,8 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 export type Post = CollectionEntry<'blog'>;
 export type Note = CollectionEntry<'notes'>;
 
-/** dev 下显示草稿（带「草稿」标记）方便预览；build 时只保留 publish: true */
-export const isVisible = (e: { data: { publish: boolean } }) => e.data.publish || import.meta.env.DEV;
+/** 网站只做展示：除非写了 publish: false，否则都显示 */
+export const isVisible = (e: { data: { publish: boolean } }) => e.data.publish;
 
 export const titleOf = (e: { id: string; data: { title?: string }; filePath?: string }) =>
   e.data.title ?? e.filePath?.split('/').pop()?.replace(/\.(md|mdx)$/i, '') ?? e.id;

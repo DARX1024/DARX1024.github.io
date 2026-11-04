@@ -41,7 +41,6 @@ const loose = (await getNotes())
               <time>{fmtDate(n.data.date)}</time>
               <a href={`/notes/${n.id}/`}>
                 {titleOf(n)}
-                {!n.data.publish && <span class="badge draft">草稿</span>}
               </a>
               {n.data.description && <span class="desc">{n.data.description}</span>}
             </li>

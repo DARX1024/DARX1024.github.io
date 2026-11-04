@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>复指数的包络</title>
+<meta name="description" content="三个实验：阻尼正弦的包络为什么是复指数的模；离散复指数的包络；离散正弦上的虚线为什么不是包络。">
+<meta name="viz:date" content="2026-11-03">
+<meta name="viz:tags" content="信号与系统, 复指数">
+<meta name="viz:thumb" content="#A .figs">
+<meta name="viz:thumb-query" content="?lab=A">
+<style>
+/* Layout: a single reading column of three labs; each lab = short text, controls, then complex plane beside the time-domain plot. */
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1b1f2a; --muted:#5a6172; --line:#dfe2ea; --grid:#eceef3;
+  --vec:#5b4fc4; --re:#0e8366; --env:#b86f0a;
+  --f-body:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",system-ui,sans-serif;
+  --f-head:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",serif;
+  --f-mono:ui-monospace,"JetBrains Mono","SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12141a; --panel:#1a1d25; --ink:#e6e8ee; --muted:#9aa1b2; --line:#2e3340; --grid:#23272f;
+  --vec:#a99cf5; --re:#3fcf9f; --env:#f0b44a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12141a; --panel:#1a1d25; --ink:#e6e8ee; --muted:#9aa1b2; --line:#2e3340; --grid:#23272f;
+  --vec:#a99cf5; --re:#3fcf9f; --env:#f0b44a; color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.75}
+.wrap{max-width:860px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+h1{font-family:var(--f-head);font-weight:600;font-size:26px;margin:0;text-wrap:balance}
+h2{font-family:var(--f-head);font-weight:500;font-size:19px;margin:0;text-wrap:balance}
+p{margin:0;max-width:66ch}
+.lede{color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:18px;height:3px;border-radius:2px;display:inline-block}
+.sw.dash{background:repeating-linear-gradient(90deg,var(--env) 0 5px,transparent 5px 8px)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.tag{font-family:var(--f-mono);font-size:12px;letter-spacing:.04em;color:var(--muted)}
+.ctl{display:grid;grid-template-columns:auto minmax(0,1fr) 64px;gap:6px 12px;align-items:center;font-size:14px}
+.ctl label{color:var(--muted);white-space:nowrap}
+.ctl output{font-family:var(--f-mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--vec)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:5px 11px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--vec);outline-offset:2px}
+.figs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.75fr);gap:14px}
+.fig{min-width:0;display:flex;flex-direction:column;gap:4px}
+.cap{font-size:12px;color:var(--muted)}
+canvas{width:100%;display:block;border-radius:8px;background:var(--bg)}
+canvas.sq{aspect-ratio:1/1;max-width:320px}
+canvas.wd{aspect-ratio:16/9}
+.read{display:flex;flex-wrap:wrap;gap:6px 20px;font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.read b{font-weight:500}
+.note{font-size:14px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
+/* ?lab=A|B|C 只显示一个实验，用于嵌入文章的对应小节 */
+:root[data-lab] header>h1,:root[data-lab] header>.lede,.wrap>section[hidden]{display:none}
+:root[data-lab] .wrap{gap:14px}
+:root[data-lab] .wrap{padding-block:4px}
+:root[data-embedded] .wrap{padding-inline:2px}
+@media (max-width:640px){.figs{grid-template-columns:minmax(0,1fr)}canvas.sq{margin:0 auto}}
+
+/* 嵌入网站时：网站会给 <html> 加 data-embedded，并传入 --site-* 配色，这里接上，让页面与正文融为一体 */
+:root[data-embedded]{--bg:var(--site-bg);--panel:var(--site-bg-soft);--ink:var(--site-fg);--muted:var(--site-muted);--line:var(--site-border);--grid:var(--site-border);--f-body:var(--site-font-body);--f-head:var(--site-font-heading)}
+:root[data-embedded] body{background:transparent}
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:10px">
+    <h1>复指数的包络</h1>
+    <p class="lede">Lecture 2 后半段图里那两条把波形夹住的虚线，在不同场合指的不是同一件事。下面三个实验各对应一种，左边是复平面，右边是时域波形。</p>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--vec)"></i>复指数（旋转的指针）</span>
+      <span><i class="sw" style="background:var(--re)"></i>实部，也就是真正画出来的信号</span>
+      <span><i class="sw dash"></i>包络 / 虚线曲线</span>
+    </div>
+  </header>
+
+  <section id="A">
+    <div class="tag">实验 1 · 连续时间</div>
+    <h2>阻尼正弦的包络就是复指数的模</h2>
+    <p>信号 x(t) = Re{C e<sup>st</sup>} = |C| e<sup>σt</sup> cos(ωt + θ)。左图指针的长度是 |C|e<sup>σt</sup>，它在实轴上的投影就是 x(t)。拖动时间，看右图中琥珀色竖线的高度始终等于左图指针的长度。</p>
+    <div class="ctl">
+      <label for="a-sg">σ 增长/衰减</label><input id="a-sg" type="range" min="-0.4" max="0.15" step="0.01" value="-0.15"><output id="a-sg-o"></output>
+      <label for="a-om">ω 旋转速度</label><input id="a-om" type="range" min="0" max="5" step="0.05" value="2.5"><output id="a-om-o"></output>
+      <label for="a-th">θ 初相（×π）</label><input id="a-th" type="range" min="-1" max="1" step="0.05" value="0"><output id="a-th-o"></output>
+      <label for="a-t">时间 t</label><input id="a-t" type="range" min="0" max="12" step="0.01" value="3.4"><output id="a-t-o"></output>
+    </div>
+    <div class="btns">
+      <button id="a-play" type="button">播放</button>
+      <label class="chk"><input id="a-im" type="checkbox">同时画虚部 Im{·}</label>
+    </div>
+    <div class="figs">
+      <div class="fig"><canvas id="a-c1" class="sq"></canvas><span class="cap">复平面：C e<sup>st</sup> 的螺旋轨迹</span></div>
+      <div class="fig"><canvas id="a-c2" class="wd"></canvas><span class="cap">时域：实部与包络 ±|C|e<sup>σt</sup>，空心圆是波形与包络相切处</span></div>
+    </div>
+    <div class="read" id="a-read"></div>
+    <p class="note">相切点（cos = ±1）不等于波形的峰值。σ &lt; 0 时，每个峰都比相切点稍早一点出现，因为求导时多出一项 σe<sup>σt</sup>cos(·)。把 σ 调到 −0.4 看得最清楚。包络描述的是指针长度，不是“把峰连起来”。</p>
+  </section>
+
+  <section id="B">
+    <div class="tag">实验 2 · 离散时间</div>
+    <h2>C α<sup>n</sup> 的包络是 |α|<sup>n</sup></h2>
+    <p>写成 α = r e<sup>jΩ</sup>，每走一步就旋转 Ω、缩放 r。实部 r<sup>n</sup>cos(Ωn) 被夹在 ±r<sup>n</sup> 之间。包络只在整数 n 上有定义，虚线只是为了看着方便。</p>
+    <div class="ctl">
+      <label for="b-r">r = |α|</label><input id="b-r" type="range" min="0.5" max="1.12" step="0.01" value="0.92"><output id="b-r-o"></output>
+      <label for="b-om">Ω（×π）</label><input id="b-om" type="range" min="0" max="1" step="0.01" value="0.2"><output id="b-om-o"></output>
+    </div>
+    <div class="btns">
+      <button type="button" data-b="0.85,0">0 &lt; α &lt; 1（实数）</button>
+      <button type="button" data-b="0.85,1">−1 &lt; α &lt; 0（Ω = π）</button>
+      <button type="button" data-b="0.92,0.2">复数 α，衰减</button>
+      <button type="button" data-b="1.06,0.15">|α| &gt; 1，增长</button>
+    </div>
+    <div class="figs">
+      <div class="fig"><canvas id="b-c1" class="sq"></canvas><span class="cap">复平面：α<sup>n</sup> 的各点</span></div>
+      <div class="fig"><canvas id="b-c2" class="wd"></canvas><span class="cap">时域：Re{α<sup>n</sup>} 与包络 ±r<sup>n</sup></span></div>
+    </div>
+    <p class="note">选 −1 &lt; α &lt; 0 时，样本每步翻转符号，在包络内上下交替。连续时间的实指数做不到这一点，它对应离散时间能表示的最高频率 Ω = π。</p>
+  </section>
+
+  <section id="C">
+    <div class="tag">实验 3 · 离散正弦上的虚线</div>
+    <h2>这条虚线不是包络，不能用来判断周期</h2>
+    <p>画离散正弦 cos(Ω<sub>0</sub>n) 时，常把连续的 cos(Ω<sub>0</sub>t) 用虚线画在样本后面。它只是穿过样本的一条曲线，不是信号本身的属性：周期可以和序列不同，而且穿过同一组样本的曲线不止一条。</p>
+    <div class="ctl">
+      <label for="c-m">Ω<sub>0</sub> = 2π·m/N，m</label><input id="c-m" type="range" min="1" max="12" step="1" value="3"><output id="c-m-o"></output>
+      <label for="c-n">N</label><input id="c-n" type="range" min="2" max="32" step="1" value="16"><output id="c-n-o"></output>
+    </div>
+    <div class="btns">
+      <label class="chk"><input id="c-irr" type="checkbox">改用 Ω<sub>0</sub> = 1 rad（与 2π 之比为无理数）</label>
+      <label class="chk"><input id="c-alias" type="checkbox">再画 Ω<sub>0</sub> + 2π 的连续曲线</label>
+    </div>
+    <div class="fig"><canvas id="c-c" class="wd" style="aspect-ratio:21/8"></canvas><span class="cap">样本 cos(Ω<sub>0</sub>n)，n = 0…40；竖线标出序列的一个周期</span></div>
+    <div class="read" id="c-read"></div>
+    <p class="note">m = 3、N = 16 时，虚线周期是 16/3 ≈ 5.33，但序列要到 n = 16 才重复。勾选 Ω<sub>0</sub> + 2π 后，另一条快得多的曲线也精确穿过每一个样本。这正是频率差 2π 无法区分的意思，也是后面混叠的来源。</p>
+  </section>
+</div>
+
+<script>
+(function(){
+const lab=new URLSearchParams(location.search).get('lab');
+if(lab&&document.getElementById(lab)){document.documentElement.dataset.lab=lab;document.querySelectorAll('.wrap>section').forEach(s=>{if(s.id!==lab)s.hidden=true})}
+})();
+(function(){
+const $=id=>document.getElementById(id);
+const tok=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function prep(cv){const r=cv.getBoundingClientRect(),d=window.devicePixelRatio||1;cv.width=Math.max(1,Math.round(r.width*d));cv.height=Math.max(1,Math.round(r.height*d));const x=cv.getContext('2d');x.setTransform(d,0,0,d,0,0);return{x,W:r.width,H:r.height}}
+function path(x,pts){x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.stroke()}
+function axes(x,W,H,cx,cy,lab){x.strokeStyle=tok('--line');x.lineWidth=1;x.setLineDash([]);x.beginPath();x.moveTo(0,cy);x.lineTo(W,cy);if(cx!=null){x.moveTo(cx,0);x.lineTo(cx,H)}x.stroke();if(lab){x.fillStyle=tok('--muted');x.font='11px '+tok('--f-mono');x.fillText('Re',W-20,cy-5);x.fillText('Im',cx+5,12)}}
+function dot(x,px,py,r,c,hollow){x.beginPath();x.arc(px,py,r,0,2*Math.PI);if(hollow){x.strokeStyle=c;x.lineWidth=1.3;x.stroke()}else{x.fillStyle=c;x.fill()}}
+const f=(v,n=2)=>(Math.abs(v)<5e-4?0:v).toFixed(n);
+
+/* ---- A ---- */
+const A={sg:$('a-sg'),om:$('a-om'),th:$('a-th'),t:$('a-t'),im:$('a-im'),play:$('a-play'),c1:$('a-c1'),c2:$('a-c2'),T:12,run:false,last:0};
+function drawA(){
+  const s=+A.sg.value,w=+A.om.value,th=+A.th.value*Math.PI,t=+A.t.value,T=A.T,C=1;
+  $('a-sg-o').textContent=f(s);$('a-om-o').textContent=f(w);$('a-th-o').textContent=f(+A.th.value);$('a-t-o').textContent=f(t);
+  const vec=tok('--vec'),re=tok('--re'),env=tok('--env'),line=tok('--line'),N=700;
+  const amp=C*Math.max(1,Math.exp(s*T));
+  const z=tau=>{const a=C*Math.exp(s*tau);return[a*Math.cos(w*tau+th),a*Math.sin(w*tau+th),a]};
+  let{x,W,H}=prep(A.c1);const cx=W/2,cy=H/2,sc=(Math.min(W,H)/2-14)/amp;
+  axes(x,W,H,cx,cy,true);
+  x.lineWidth=1;x.strokeStyle=line;path(x,Array.from({length:N+1},(_,i)=>{const p=z(i/N*T);return[cx+sc*p[0],cy-sc*p[1]]}));
+  x.lineWidth=1.8;x.strokeStyle=vec;path(x,Array.from({length:N+1},(_,i)=>{const p=z(i/N*t);return[cx+sc*p[0],cy-sc*p[1]]}));
+  const p=z(t);
+  x.setLineDash([4,4]);x.strokeStyle=env;x.lineWidth=1.2;x.beginPath();x.arc(cx,cy,sc*p[2],0,2*Math.PI);x.stroke();
+  x.strokeStyle=re;x.beginPath();x.moveTo(cx+sc*p[0],cy-sc*p[1]);x.lineTo(cx+sc*p[0],cy);x.stroke();x.setLineDash([]);
+  x.strokeStyle=vec;x.lineWidth=2.4;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+sc*p[0],cy-sc*p[1]);x.stroke();
+  dot(x,cx+sc*p[0],cy-sc*p[1],4,vec);dot(x,cx+sc*p[0],cy,4,re);
+  ({x,W,H}=prep(A.c2));const pad=10,mid=H/2,ys=(H/2-12)/amp,X=tau=>pad+tau/T*(W-2*pad);
+  axes(x,W,H,null,mid,false);
+  x.setLineDash([5,4]);x.strokeStyle=env;x.lineWidth=1.3;
+  for(const sg of[1,-1])path(x,Array.from({length:N+1},(_,i)=>{const tau=i/N*T;return[X(tau),mid-sg*ys*C*Math.exp(s*tau)]}));
+  x.setLineDash([]);
+  if(A.im.checked){x.strokeStyle=vec;x.lineWidth=1.2;x.globalAlpha=.55;path(x,Array.from({length:N+1},(_,i)=>{const tau=i/N*T;return[X(tau),mid-ys*z(tau)[1]]}));x.globalAlpha=1}
+  x.strokeStyle=re;x.lineWidth=1;x.globalAlpha=.35;path(x,Array.from({length:N+1},(_,i)=>{const tau=i/N*T;return[X(tau),mid-ys*z(tau)[0]]}));x.globalAlpha=1;
+  x.lineWidth=2;path(x,Array.from({length:N+1},(_,i)=>{const tau=i/N*t;return[X(tau),mid-ys*z(tau)[0]]}));
+  if(w>0.05){const k0=Math.ceil(th/Math.PI),k1=Math.floor((w*T+th)/Math.PI);if(k1-k0<80)for(let k=k0;k<=k1;k++){const tau=(k*Math.PI-th)/w;if(tau<0||tau>T)continue;dot(x,X(tau),mid-ys*z(tau)[0],3.5,env,true)}}
+  x.strokeStyle=env;x.lineWidth=3;x.beginPath();x.moveTo(X(t),mid);x.lineTo(X(t),mid-ys*p[2]);x.stroke();
+  dot(x,X(t),mid-ys*p[0],4.5,re);
+  x.fillStyle=tok('--muted');x.font='11px '+tok('--f-mono');x.fillText('t',W-12,mid-5);
+  $('a-read').innerHTML=`<span>指针长度 |Ce<sup>st</sup>| = <b style="color:var(--env)">${f(p[2],3)}</b></span><span>实部 x(t) = <b style="color:var(--re)">${f(p[0],3)}</b></span><span>转过的角度 = ${f((w*t+th)/Math.PI,2)}π</span>`;
+}
+[A.sg,A.om,A.th,A.t,A.im].forEach(e=>e.addEventListener('input',drawA));
+function tick(ts){if(!A.run)return;const dt=A.last?Math.min(0.05,(ts-A.last)/1000):0;A.last=ts;let t=+A.t.value+dt*1.2;if(t>A.T)t=0;A.t.value=t;drawA();requestAnimationFrame(tick)}
+A.play.addEventListener('click',()=>{A.run=!A.run;A.play.textContent=A.run?'暂停':'播放';if(A.run){A.last=0;if(+A.t.value>=A.T-0.01)A.t.value=0;requestAnimationFrame(tick)}});
+
+/* ---- B ---- */
+const B={r:$('b-r'),om:$('b-om'),c1:$('b-c1'),c2:$('b-c2'),N:32};
+function drawB(){
+  const r=+B.r.value,Om=+B.om.value*Math.PI,N=B.N;$('b-r-o').textContent=f(r);$('b-om-o').textContent=f(+B.om.value);
+  const vec=tok('--vec'),re=tok('--re'),env=tok('--env'),line=tok('--line');
+  const pts=Array.from({length:N},(_,n)=>{const a=Math.pow(r,n);return[a*Math.cos(Om*n),a*Math.sin(Om*n),a]});
+  const amp=Math.max(...pts.map(p=>p[2]));
+  let{x,W,H}=prep(B.c1);const cx=W/2,cy=H/2,sc=(Math.min(W,H)/2-14)/amp;
+  axes(x,W,H,cx,cy,true);
+  x.setLineDash([3,4]);x.strokeStyle=line;x.lineWidth=1;x.beginPath();x.arc(cx,cy,sc,0,2*Math.PI);x.stroke();x.setLineDash([]);
+  x.strokeStyle=vec;x.globalAlpha=.35;path(x,pts.map(p=>[cx+sc*p[0],cy-sc*p[1]]));x.globalAlpha=1;
+  pts.forEach((p,n)=>dot(x,cx+sc*p[0],cy-sc*p[1],n===0?4.5:3,vec));
+  x.fillStyle=tok('--muted');x.font='11px '+tok('--f-mono');x.fillText('n=0',cx+sc*pts[0][0]-12,cy-sc*pts[0][1]-8);
+  ({x,W,H}=prep(B.c2));const pad=14,mid=H/2,ys=(H/2-12)/amp,X=n=>pad+n/(N-1)*(W-2*pad);
+  axes(x,W,H,null,mid,false);
+  x.setLineDash([5,4]);x.strokeStyle=env;x.lineWidth=1.3;
+  for(const sg of[1,-1])path(x,Array.from({length:301},(_,i)=>{const n=i/300*(N-1);return[X(n),mid-sg*ys*Math.pow(r,n)]}));
+  x.setLineDash([]);
+  pts.forEach((p,n)=>{x.strokeStyle=re;x.lineWidth=1.6;x.beginPath();x.moveTo(X(n),mid);x.lineTo(X(n),mid-ys*p[0]);x.stroke();dot(x,X(n),mid-ys*p[0],3.2,re)});
+  x.fillStyle=tok('--muted');x.font='11px '+tok('--f-mono');x.fillText('n',W-12,mid-5);
+}
+[B.r,B.om].forEach(e=>e.addEventListener('input',drawB));
+document.querySelectorAll('[data-b]').forEach(b=>b.addEventListener('click',()=>{const[r,o]=b.dataset.b.split(',');B.r.value=r;B.om.value=o;drawB()}));
+
+/* ---- C ---- */
+const Cc={m:$('c-m'),n:$('c-n'),irr:$('c-irr'),al:$('c-alias'),cv:$('c-c'),L:40};
+const gcd=(a,b)=>b?gcd(b,a%b):a;
+function drawC(){
+  const m=+Cc.m.value,Nn=+Cc.n.value,irr=Cc.irr.checked;$('c-m-o').textContent=m;$('c-n-o').textContent=Nn;
+  Cc.m.disabled=Cc.n.disabled=irr;
+  const Om=irr?1:2*Math.PI*m/Nn,L=Cc.L;
+  const vec=tok('--vec'),re=tok('--re'),env=tok('--env'),line=tok('--line');
+  const{x,W,H}=prep(Cc.cv);const pad=14,mid=H/2,ys=H/2-14,X=n=>pad+n/L*(W-2*pad);
+  axes(x,W,H,null,mid,false);
+  const per=irr?null:Nn/gcd(m,Nn);
+  if(per&&per<=L){x.strokeStyle=line;x.lineWidth=1;for(const n of[0,per]){x.beginPath();x.moveTo(X(n),6);x.lineTo(X(n),H-6);x.stroke()}x.fillStyle=tok('--muted');x.font='11px '+tok('--f-mono');x.fillText('一个周期',X(per/2)-24,14)}
+  const M=1600;
+  if(Cc.al.checked){x.setLineDash([3,3]);x.strokeStyle=vec;x.lineWidth=1;x.globalAlpha=.7;path(x,Array.from({length:M+1},(_,i)=>{const t=i/M*L;return[X(t),mid-ys*Math.cos((Om+2*Math.PI)*t)]}));x.globalAlpha=1}
+  x.setLineDash([5,4]);x.strokeStyle=env;x.lineWidth=1.4;path(x,Array.from({length:M+1},(_,i)=>{const t=i/M*L;return[X(t),mid-ys*Math.cos(Om*t)]}));x.setLineDash([]);
+  for(let n=0;n<=L;n++){const v=Math.cos(Om*n);x.strokeStyle=re;x.lineWidth=1.6;x.beginPath();x.moveTo(X(n),mid);x.lineTo(X(n),mid-ys*v);x.stroke();dot(x,X(n),mid-ys*v,3.2,re)}
+  const envPer=2*Math.PI/Om;
+  $('c-read').innerHTML=`<span>Ω<sub>0</sub> = ${irr?'1 rad':`2π·${m}/${Nn} = ${f(Om/Math.PI,3)}π`}</span><span>虚线周期 2π/Ω<sub>0</sub> = <b style="color:var(--env)">${f(envPer,2)}</b></span><span>序列周期 = <b style="color:var(--re)">${irr?'不是周期的':per}</b></span>`;
+}
+[Cc.m,Cc.n,Cc.irr,Cc.al].forEach(e=>e.addEventListener('input',drawC));
+
+const vis=id=>!$(id).hidden;
+function all(){if(vis('A'))drawA();if(vis('B'))drawB();if(vis('C'))drawC()}
+let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(all,60)});
+try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',all)}catch(e){}
+new MutationObserver(all).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme','data-embedded','style']});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(all);
+all();
+})();
+</script>

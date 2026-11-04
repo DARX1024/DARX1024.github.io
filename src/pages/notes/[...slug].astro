@@ -34,7 +34,6 @@ const { Content, headings } = await render(note);
   updated={note.data.updated}
   tags={note.data.tags}
   minutes={readingMinutes(note.body)}
-  draft={!note.data.publish}
   headings={headings}
   showToc={note.data.toc}
 >
@@ -55,11 +54,13 @@ const { Content, headings } = await render(note);
 
 <style>
   .kicker {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
+    letter-spacing: 0.04em;
     color: var(--muted);
-    margin: 0 0 0.6rem;
+    margin: 0 0 0.9rem;
   }
   .kicker a {
     text-decoration: none;
+    color: var(--accent);
   }
 </style>
