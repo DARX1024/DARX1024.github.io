@@ -13,6 +13,9 @@
     'PingFang SC', 'Microsoft YaHei', monospace;
 
   --font-body: var(--font-sans); /* 想要衬线正文就改成 var(--font-serif) */
+  /* 标题：西文用衬线，中文仍回落到黑体（Windows 没有好看的中文衬线，宋体加粗很难看） */
+  --font-heading: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Source Serif 4', Georgia, 'PingFang SC',
+    'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', serif;
 
   --measure: 40rem; /* 正文行宽：约 38 个汉字 / 75 个英文字符 */
   --wide: 56rem;
@@ -33,16 +36,17 @@
 }
 
 :root[data-theme='dark'] {
-  --bg: #17181b;
-  --bg-soft: #1f2024;
-  --fg: #dddad3;
-  --fg-soft: #b9b6ae;
-  --muted: #85837d;
-  --border: #2d2e33;
-  --accent: #8db4dc;
-  --accent-soft: rgba(141, 180, 220, 0.12);
-  --mark: rgba(255, 200, 80, 0.25);
-  --selection: rgba(141, 180, 220, 0.25);
+  /* 「夜读」：暖棕黑底 + 米白字 + 琥珀点缀。背景不用纯黑、文字不用纯白，长时间阅读更舒服 */
+  --bg: #171513;
+  --bg-soft: #201d1a;
+  --fg: #e6dccb;
+  --fg-soft: #c2b6a2;
+  --muted: #8a7f70;
+  --border: #2c2824;
+  --accent: #d9a55b;
+  --accent-soft: rgba(217, 165, 91, 0.12);
+  --mark: rgba(217, 165, 91, 0.25);
+  --selection: rgba(217, 165, 91, 0.25);
 
   color-scheme: dark;
 }
@@ -389,3 +393,22 @@ main {
     grid-column: 2;
   }
 
+
+/* 标题字体 */
+h1,
+h2,
+h3,
+h4,
+.site-title,
+.card h3 {
+  font-family: var(--font-heading);
+}
+.section-label,
+.year {
+  font-family: var(--font-body);
+}
+
+/* 暗色下压暗正文图片，避免浅底示意图刺眼 */
+:root[data-theme='dark'] .prose img {
+  filter: brightness(0.85) contrast(1.05);
+}
