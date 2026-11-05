@@ -10,11 +10,14 @@ const tags = z
   .optional()
   .transform((v) => (v == null ? [] : Array.isArray(v) ? v : v.split(/[,，\s]+/).filter(Boolean)));
 
+// Obsidian 的属性面板里留空的字段会写成 `key:`（null）。当作没写处理，否则日期会变成 1970 年、字符串字段会报错
+const blank = <T extends z.ZodTypeAny>(s: T) => z.preprocess((v) => (v === null || v === '' ? undefined : v), s);
+
 const base = {
-  title: z.string().optional(), // 不写就用文件名
-  description: z.string().optional(),
-  date: z.coerce.date().optional(),
-  updated: z.coerce.date().optional(),
+  title: blank(z.string().optional()), // 不写就用文件名
+  description: blank(z.string().optional()),
+  date: blank(z.coerce.date().optional()),
+  updated: blank(z.coerce.date().optional()),
   tags,
   publish: z.boolean().default(true), // 网站只做展示：默认发布，写 publish: false 可临时隐藏
   toc: z.boolean().default(true),
@@ -84,23 +87,27 @@ const games = defineCollection({
   schema: z.object({
     ...base,
     // Steam appid，也可以直接粘贴商店链接 https://store.steampowered.com/app/1245620/...
-    steam: z
-      .union([z.number(), z.string()])
-      .optional()
-      .transform((v) => {
-        const m = v == null ? null : String(v).match(/(?:\/app\/)?(\d+)/);
-        return m ? Number(m[1]) : undefined;
-      }),
-    platform: z.string().optional(), // 非 Steam 游戏写 Switch / PS5 / iOS 等
-    status: z
-      .string()
-      .optional()
-      .transform((v) => (v ? STATUS[v.trim().toLowerCase()] ?? STATUS[v.trim()] : undefined)),
-    rating: z.coerce.number().min(0).max(10).optional(), // 10 分制
-    started: z.coerce.date().optional(),
-    finished: z.coerce.date().optional(), // 通关日期
-    hours: z.coerce.number().optional(), // 手动填写的时长；Steam 游戏不用填
-    cover: z.string().optional(), // 封面：图片链接，或 attachments/ 里的文件名（也可以写 [[封面.jpg]]）
+    steam: blank(
+      z
+        .union([z.number(), z.string()])
+        .optional()
+        .transform((v) => {
+          const m = v == null ? null : String(v).match(/\/app\/(\d+)/) ?? String(v).match(/^\s*(\d+)\s*$/);
+          return m ? Number(m[1]) : undefined;
+        }),
+    ),
+    platform: blank(z.string().optional()), // 非 Steam 游戏写 Switch / PS5 / iOS 等
+    status: blank(
+      z
+        .string()
+        .optional()
+        .transform((v) => (v ? STATUS[v.trim().toLowerCase()] ?? STATUS[v.trim()] : undefined)),
+    ),
+    rating: blank(z.coerce.number().min(0).max(10).optional()), // 10 分制
+    started: blank(z.coerce.date().optional()),
+    finished: blank(z.coerce.date().optional()), // 通关日期
+    hours: blank(z.coerce.number().optional()), // 手动填写的时长；Steam 游戏不用填
+    cover: blank(z.string().optional()), // 封面：图片链接，或 attachments/ 里的文件名（也可以写 [[封面.jpg]]）
   }),
 });
 
