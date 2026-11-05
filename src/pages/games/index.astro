@@ -911,9 +911,16 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
     store.classList.toggle('primary', !d.review);
   }
 
+  const visible = (el: Element | null) => {
+    const r = el?.getBoundingClientRect();
+    return !!r && r.height > 0 && r.bottom > 0 && r.top < innerHeight;
+  };
+
   function open(slug: string, from?: HTMLElement | null) {
     if (!data[slug]) return;
     origin = from?.querySelector<HTMLImageElement>('.poster img') ?? null;
+    // 原海报不在视口里（比如从顶部「详情」按钮打开）就不做飞入，只让卡片淡入
+    if (!visible(origin)) origin = null;
     const show = () => {
       fill(slug);
       if (!dlg.open) dlg.showModal();
@@ -936,8 +943,7 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
     history.replaceState(null, '', location.pathname + location.search);
     if (!canVT) return done();
     // 关闭时海报飞回原来的位置（原海报不在视口里就只做淡出）
-    const r = origin?.getBoundingClientRect();
-    if (!r || r.bottom < 0 || r.top > innerHeight) origin = null;
+    if (!visible(origin)) origin = null;
     posterBox.style.viewTransitionName = origin ? 'gd-poster' : '';
     document.documentElement.classList.add('gd-vt');
     document
