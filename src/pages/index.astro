@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import VizCard from '../components/VizCard.astro';
+import Globe from '../components/Globe.astro';
 import { getCollection } from 'astro:content';
 import { SITE } from '../site.config';
 import { getPosts, getNotes, getSeries, seriesIdOf, titleOf, fmtDate } from '../lib/content';
@@ -92,6 +93,8 @@ const viz = [...allViz].sort((a, b) => (b.data.date?.valueOf() ?? 0) - (a.data.d
       </section>
     )
   }
+
+  <Globe />
 </Base>
 
 <style>
