@@ -22,7 +22,7 @@ const shelf = games.filter((g) => g.status !== 'wishlist').slice(0, 6);
           <a href="/games/">游戏墙 →</a>
         </h2>
         <div class="shelf">
-          {shelf.map((g) => <GameCard g={g} eager />)}
+          {shelf.map((g) => <GameCard g={g} eager external />)}
         </div>
       </section>
     )

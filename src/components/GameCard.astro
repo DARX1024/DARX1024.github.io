@@ -1,57 +1,63 @@
 ---
-// 游戏墙上的一张海报：默认去色，悬停时恢复颜色；底边一条细线表示成就进度
+// 游戏墙上的一张海报。悬停时：海报跟着鼠标轻微 3D 倾斜，表面有一道随鼠标移动的反光，
+// 背后透出一圈封面颜色的柔光（像把唱片从架子上抽出来）。点击打开详情卡（见 pages/games/index.astro）。
 import { STATUS_LABEL, fmtHours, type Game } from '../lib/games';
-import { vtStyle } from '../lib/content';
 
 interface Props {
   g: Game;
   /** 首屏的几张不懒加载 */
   eager?: boolean;
-  /** 标题参与页面切换动画（同一页里同一款游戏只能有一处开启） */
-  vt?: boolean;
+  /** 不在游戏墙页面时（比如生活页），点击跳到游戏墙并打开这款游戏的详情 */
+  external?: boolean;
+  /** 显示在海报下方的小字；默认是「状态 · 时长」 */
+  meta?: string;
 }
-const { g, eager = false, vt = false } = Astro.props;
+const { g, eager = false, external = false, meta } = Astro.props;
 const review = !!g.href && !g.external;
 const pct = g.ach && g.ach[1] > 0 ? g.ach[0] / g.ach[1] : undefined;
-const meta = [g.status && STATUS_LABEL[g.status], fmtHours(g.hours) || (g.platform !== 'Steam' ? g.platform : '')].filter(Boolean);
-const Tag = g.href ? 'a' : 'div';
+const line =
+  meta ?? [g.status && STATUS_LABEL[g.status], fmtHours(g.hours) || (g.platform !== 'Steam' ? g.platform : '')].filter(Boolean).join(' · ');
+// 没有 JS 时的去处：有评测去评测页，否则 Steam 商店
+const href = external ? `/games/#${encodeURIComponent(g.slug)}` : g.href ?? `#${encodeURIComponent(g.slug)}`;
 // 竖版封面加载失败 → 换横版头图 → 再失败就显示文字封面
 const onerror =
-  "var f=this.dataset.fallback;if(f){this.removeAttribute('data-fallback');this.src=f;this.classList.add('wide')}else{this.parentNode.classList.add('no-img')}";
+  "var f=this.dataset.fallback;if(f){this.removeAttribute('data-fallback');this.src=f;this.classList.add('wide')}else{this.closest('.poster').classList.add('no-img')}";
 ---
 
-<Tag
+<a
   class:list={['game', { review, recent: g.recent }]}
-  href={g.href}
-  target={g.external ? '_blank' : undefined}
-  rel={g.external ? 'noopener' : undefined}
-  title={g.external ? `${g.title}（Steam 商店）` : undefined}
+  href={href}
+  data-game={g.slug}
+  style={g.cover ? `--cover:url("${g.cover}")` : undefined}
 >
-  <span class:list={['poster', { 'no-img': !g.cover }]}>
-    {
-      g.cover && (
-        <img
-          src={g.cover}
-          data-fallback={g.coverFallback}
-          alt=""
-          loading={eager ? 'eager' : 'lazy'}
-          decoding="async"
-          referrerpolicy="no-referrer"
-          onerror={onerror}
-        />
-      )
-    }
-    <span class="poster-text" aria-hidden="true">{g.title}</span>
-    {g.rating != null && <span class="rating num" title="评分（10 分制）">{g.rating.toFixed(1)}</span>}
-    {
-      pct != null && (
-        <span class="ach" title={`成就 ${g.ach![0]} / ${g.ach![1]}`}>
-          <span style={`transform:scaleX(${pct})`} />
-        </span>
-      )
-    }
+  <span class="tilt">
+    <span class:list={['poster', { 'no-img': !g.cover }]}>
+      {
+        g.cover && (
+          <img
+            src={g.cover}
+            data-fallback={g.coverFallback}
+            alt=""
+            loading={eager ? 'eager' : 'lazy'}
+            decoding="async"
+            referrerpolicy="no-referrer"
+            onerror={onerror}
+          />
+        )
+      }
+      <span class="poster-text" aria-hidden="true">{g.title}</span>
+      {g.rating != null && <span class="rating num" title="评分（10 分制）">{g.rating.toFixed(1)}</span>}
+      {
+        pct != null && (
+          <span class="ach" title={`成就 ${g.ach![0]} / ${g.ach![1]}`}>
+            <span style={`transform:scaleX(${pct})`} />
+          </span>
+        )
+      }
+      <span class="sheen" aria-hidden="true"></span>
+    </span>
   </span>
-  <span class="g-title" style={vt && review ? vtStyle('game', g.entry!.id) : undefined}>
+  <span class="g-title">
     {g.title}
     {
       review && (
@@ -62,28 +68,70 @@ const onerror =
       )
     }
   </span>
-  {meta.length > 0 && <span class="g-meta">{meta.join(' · ')}</span>}
-</Tag>
+  {line && <span class="g-meta">{line}</span>}
+</a>
 
 <style>
   .game {
+    --rx: 0deg;
+    --ry: 0deg;
+    --mx: 50%;
+    --my: 30%;
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
     min-width: 0;
     text-decoration: none;
     color: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* 封面色的柔光：悬停时从海报背后透出来 */
+  .game::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    left: 6%;
+    top: 8%;
+    aspect-ratio: 2 / 3;
+    width: 88%;
+    background: var(--cover) center / cover;
+    filter: blur(26px) saturate(1.6);
+    opacity: 0;
+    transform: translateY(6%) scale(0.9);
+    transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+    pointer-events: none;
+  }
+  .tilt {
+    position: relative;
+    z-index: 1;
+    display: block;
+    margin-bottom: 0.6rem;
+    perspective: 900px;
   }
   .poster {
     position: relative;
     display: block;
     aspect-ratio: 2 / 3;
-    margin-bottom: 0.55rem;
     overflow: hidden;
     border-radius: 6px;
-    border: 1px solid var(--border);
     background: var(--bg-soft);
-    transition: border-color 0.25s, transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.35s;
+    /* 一圈极细的内描边 + 底部投影，像实体封套的厚度 */
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.06),
+      0 1px 2px rgb(0 0 0 / 0.2),
+      0 8px 18px -10px rgb(0 0 0 / 0.5);
+    transform: rotateX(var(--rx)) rotateY(var(--ry));
+    transform-style: preserve-3d;
+    transition:
+      transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1),
+      box-shadow 0.5s ease;
+  }
+  :global(:root[data-theme='light']) .poster {
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 0.06),
+      0 1px 2px rgb(0 0 0 / 0.08),
+      0 8px 18px -10px rgb(0 0 0 / 0.3);
   }
   .poster img {
     position: absolute;
@@ -91,21 +139,21 @@ const onerror =
     width: 100%;
     height: 100%;
     object-fit: cover;
-    /* 去色 + 一点暖调，和站点的线稿/纸张气质一致；悬停时恢复原色 */
-    filter: grayscale(1) sepia(0.12) contrast(0.96) brightness(1.02);
-    transition: filter 0.5s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+    /* 平时略收一点饱和与亮度，和页面的暖色调融在一起；选中时完全展开 */
+    filter: saturate(0.82) brightness(0.94);
+    transition:
+      filter 0.45s ease,
+      transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
   }
   :global(:root[data-theme='dark']) .poster img {
-    filter: grayscale(1) sepia(0.28) brightness(0.72) contrast(1.05);
+    filter: saturate(0.8) brightness(0.84);
   }
-  /* 只有横版头图时：居中放在海报中间，上下留白 */
   .poster img.wide {
     object-fit: contain;
   }
   .poster.no-img img {
     display: none;
   }
-  /* 文字封面：没有图或图加载失败时显示 */
   .poster-text {
     position: absolute;
     inset: 0;
@@ -121,28 +169,41 @@ const onerror =
   .poster.no-img .poster-text {
     display: grid;
   }
+  /* 反光：一块跟着鼠标走的柔和高光 + 一道斜向的光带 */
+  .sheen {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    background:
+      radial-gradient(circle at var(--mx) var(--my), rgb(255 255 255 / 0.28), transparent 42%),
+      linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.08) 45%, transparent 55%);
+    mix-blend-mode: soft-light;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
   .rating {
     position: absolute;
+    z-index: 1;
     top: 0.45rem;
     right: 0.45rem;
-    padding: 0.05rem 0.4rem;
+    padding: 0.05rem 0.42rem;
     border-radius: 4px;
     font-family: var(--font-heading);
     font-size: 0.8125rem;
     line-height: 1.5;
-    color: var(--fg);
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    color: #f3ece0;
+    background: rgb(20 18 16 / 0.62);
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
   }
-  /* 成就进度：海报底边的一条细线 */
   .ach {
     position: absolute;
+    z-index: 1;
     left: 0;
     right: 0;
     bottom: 0;
     height: 2px;
-    background: color-mix(in srgb, var(--bg) 55%, transparent);
+    background: rgb(0 0 0 / 0.35);
   }
   .ach span {
     display: block;
@@ -151,25 +212,62 @@ const onerror =
     transform-origin: 0 50%;
   }
 
-  a.game:hover .poster {
-    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-    transform: translateY(-3px);
-    box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.45);
+  /* ---- 选中（悬停 / 键盘聚焦） ---- */
+  .game:hover::before,
+  .game:focus-visible::before {
+    opacity: 0.55;
+    transform: translateY(10%) scale(1);
   }
-  a.game:hover .poster img,
-  a.game:focus-visible .poster img {
+  .game:hover .poster,
+  .game:focus-visible .poster {
+    transform: translateY(-6px) rotateX(var(--rx)) rotateY(var(--ry)) scale(1.03);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.1),
+      0 2px 4px rgb(0 0 0 / 0.2),
+      0 22px 36px -16px rgb(0 0 0 / 0.65);
+  }
+  .game:hover .poster img,
+  .game:focus-visible .poster img {
     filter: none;
-    transform: scale(1.03);
+    transform: scale(1.04);
   }
-  /* 触屏没有悬停：保留一点颜色 */
+  .game:hover .sheen,
+  .game:focus-visible .sheen {
+    opacity: 1;
+  }
+  .game:focus-visible {
+    outline: none;
+  }
+  .game:focus-visible .poster {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  /* 跟随鼠标时不要过渡延迟，否则倾斜会「拖」在鼠标后面 */
+  .game.tracking .poster {
+    transition:
+      transform 0.12s linear,
+      box-shadow 0.5s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .game .poster,
+    .game:hover .poster {
+      transform: none;
+    }
+    .game::before {
+      display: none;
+    }
+  }
+  /* 触屏没有悬停：封面直接用原色 */
   @media (hover: none) {
     .poster img,
     :global(:root[data-theme='dark']) .poster img {
-      filter: saturate(0.4) brightness(0.9);
+      filter: none;
     }
   }
 
   .g-title {
+    position: relative;
+    z-index: 1;
     font-family: var(--font-heading);
     font-weight: 600;
     font-size: 0.9375rem;
@@ -178,8 +276,9 @@ const onerror =
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    transition: color 0.2s;
   }
-  a.game:hover .g-title {
+  .game:hover .g-title {
     color: var(--accent);
   }
   .pen {
@@ -189,6 +288,8 @@ const onerror =
     color: var(--accent);
   }
   .g-meta {
+    position: relative;
+    z-index: 1;
     font-size: 0.75rem;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
@@ -205,3 +306,35 @@ const onerror =
     box-shadow: 0 0 0 3px var(--accent-soft);
   }
 </style>
+
+<script>
+  // 鼠标在海报上移动时：算出倾斜角度和高光位置，写进 CSS 变量。全站只绑一次（事件委托）
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches && matchMedia('(hover: hover)').matches) {
+    let frame = 0;
+    document.addEventListener('pointermove', (e) => {
+      const card = (e.target as Element).closest?.<HTMLElement>('a.game');
+      if (!card) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const r = card.querySelector('.poster')!.getBoundingClientRect();
+        const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+        const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+        card.classList.add('tracking');
+        card.style.setProperty('--ry', `${(x - 0.5) * 14}deg`);
+        card.style.setProperty('--rx', `${(0.5 - y) * 12}deg`);
+        card.style.setProperty('--mx', `${x * 100}%`);
+        card.style.setProperty('--my', `${y * 100}%`);
+      });
+    });
+    document.addEventListener(
+      'pointerout',
+      (e) => {
+        const card = (e.target as Element).closest?.<HTMLElement>('a.game');
+        if (!card || card.contains(e.relatedTarget as Node)) return;
+        card.classList.remove('tracking');
+        for (const k of ['--rx', '--ry', '--mx', '--my']) card.style.removeProperty(k);
+      },
+      true,
+    );
+  }
+</script>

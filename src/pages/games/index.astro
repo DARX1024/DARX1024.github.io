@@ -1,7 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import GameCard from '../../components/GameCard.astro';
-import { getGames, steamUpdatedAt, STATUS_LABEL, type Status } from '../../lib/games';
+import { getGames, steamUpdatedAt, STATUS_LABEL, fmtHours, type Status, type Game } from '../../lib/games';
 import { fmtDate } from '../../lib/content';
 
 const games = await getGames();
@@ -12,96 +12,475 @@ const filters = [
   { key: 'review', label: '有评测', n: games.filter((g) => g.href && !g.external).length },
 ].filter((f) => f.key === 'all' || f.n > 0);
 const totalHours = Math.round(games.reduce((t, g) => t + (g.hours ?? 0), 0));
+
+// 顶部焦点：最近两周玩过的里最后玩的那款；没有就用最近有动静的
+const byLast = (a: Game, b: Game) => (b.last?.valueOf() ?? 0) - (a.last?.valueOf() ?? 0);
+const spotlight = [...games.filter((g) => g.recent)].sort(byLast)[0] ?? games.find((g) => g.status !== 'wishlist');
+
+// 横向货架：像流媒体首页一样按主题分几排；游戏太少时不分
+const shelves =
+  games.length < 8
+    ? []
+    : [
+        { title: '在玩', items: games.filter((g) => g.status === 'playing') },
+        {
+          title: '最近通关',
+          items: games.filter((g) => g.status === 'finished').sort((a, b) => (b.finished?.valueOf() ?? 0) - (a.finished?.valueOf() ?? 0)),
+        },
+        { title: '私藏高分', items: games.filter((g) => (g.rating ?? 0) >= 8.5).sort((a, b) => b.rating! - a.rating!) },
+        { title: '玩得最久', items: [...games].sort((a, b) => (b.hours ?? 0) - (a.hours ?? 0)).slice(0, 14) },
+      ].filter((s) => s.items.length >= 2);
+
+// 详情卡的数据：点击海报时由脚本填进对话框
+const detail = Object.fromEntries(
+  games.map((g) => [
+    g.slug,
+    {
+      title: g.title,
+      cover: g.cover,
+      coverFallback: g.coverFallback,
+      hero: g.hero,
+      status: g.status && STATUS_LABEL[g.status],
+      platform: g.platform,
+      rating: g.rating,
+      hours: fmtHours(g.hours),
+      ach: g.ach,
+      last: g.last?.valueOf(),
+      finished: g.finished && fmtDate(g.finished),
+      desc: g.description,
+      review: g.href && !g.external ? g.href : undefined,
+      store: g.appid ? `https://store.steampowered.com/app/${g.appid}/` : undefined,
+    },
+  ]),
+);
+const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
 ---
 
 <Base title="游戏墙" description="玩过、在玩和想玩的游戏" wide>
-  <p class="crumb"><a href="/life/">生活</a></p>
-  <h1 class="page-title">游戏墙</h1>
-  <p class="page-lede">
-    {games.length} 款{count('finished') > 0 && ` · 通关 ${count('finished')}`}{totalHours > 0 && ` · 共 ${totalHours.toLocaleString('en-US')} 小时`}
-    {steamUpdatedAt && <span class="muted"> · Steam 数据同步于 {fmtDate(steamUpdatedAt)}</span>}
-  </p>
-
-  {
-    games.length > 0 ? (
-      <>
-        <div class="toolbar">
-          <div class="filters" role="group" aria-label="按状态筛选">
-            {filters.map((f, i) => (
-              <button type="button" data-filter={f.key} aria-pressed={i === 0 ? 'true' : 'false'}>
-                {f.label}
-                <span class="num">{f.n}</span>
-              </button>
-            ))}
+  <div class="games-page">
+    {
+      spotlight && (
+        <section class="spot" data-hero style={spotlight.cover ? `--cover:url("${spotlight.cover}")` : undefined}>
+          <div class="spot-bg" aria-hidden="true">
+            {spotlight.hero && <img src={spotlight.hero} alt="" referrerpolicy="no-referrer" onerror={heroFail} />}
           </div>
-          <label class="sort">
-            <span class="sr-only">排序</span>
-            <select>
-              <option value="activity">最近</option>
-              <option value="hours">时长</option>
-              <option value="rating">评分</option>
-            </select>
-          </label>
+          <div class="spot-inner">
+            <p class="crumb">
+              <a href="/life/">生活</a> / 游戏墙
+            </p>
+            <p class="spot-kicker">{spotlight.recent ? '最近在玩' : '最近'}</p>
+            <h1 class="spot-title">{spotlight.title}</h1>
+            <p class="spot-meta num">
+              {[spotlight.status && STATUS_LABEL[spotlight.status], fmtHours(spotlight.hours) && `累计 ${fmtHours(spotlight.hours)}`, spotlight.ach && spotlight.ach[1] > 0 && `成就 ${spotlight.ach[0]}/${spotlight.ach[1]}`]
+                .filter(Boolean)
+                .join(' · ')}
+              {spotlight.last && <span data-ago={spotlight.last.valueOf()} />}
+            </p>
+            {spotlight.description && <p class="spot-desc">{spotlight.description}</p>}
+            <p class="spot-actions">
+              <a class="btn primary" href={`#${encodeURIComponent(spotlight.slug)}`} data-open={spotlight.slug}>
+                详情
+              </a>
+              {spotlight.href && !spotlight.external && <a class="btn" href={spotlight.href}>读评测</a>}
+            </p>
+          </div>
+        </section>
+      )
+    }
+
+    <p class="stats num">
+      {games.length} 款{count('finished') > 0 && ` · 通关 ${count('finished')}`}{totalHours > 0 && ` · 共 ${totalHours.toLocaleString('en-US')} 小时`}
+      {steamUpdatedAt && <span class="muted"> · Steam 数据同步于 {fmtDate(steamUpdatedAt)}</span>}
+    </p>
+
+    {
+      shelves.map((s) => (
+        <section class="shelf">
+          <header class="shelf-head">
+            <h2>
+              {s.title}
+              <span class="num">{s.items.length}</span>
+            </h2>
+            <span class="shelf-nav">
+              <button type="button" data-dir="-1" aria-label="向左">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M10 3L5 8l5 5" /></svg>
+              </button>
+              <button type="button" data-dir="1" aria-label="向右">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 3l5 5-5 5" /></svg>
+              </button>
+            </span>
+          </header>
+          <div class="track">
+            {s.items.map((g, i) => <GameCard g={g} eager={i < 6} />)}
+          </div>
+        </section>
+      ))
+    }
+
+    {
+      games.length > 0 ? (
+        <section class="all">
+          <header class="toolbar">
+            <h2 class="all-title">{shelves.length ? '全部' : '游戏墙'}</h2>
+            <div class="filters" role="group" aria-label="按状态筛选">
+              {filters.map((f, i) => (
+                <button type="button" data-filter={f.key} aria-pressed={i === 0 ? 'true' : 'false'}>
+                  {f.label}
+                  <span class="num">{f.n}</span>
+                </button>
+              ))}
+            </div>
+            <label class="sort">
+              <span class="sr-only">排序</span>
+              <select>
+                <option value="activity">最近</option>
+                <option value="hours">时长</option>
+                <option value="rating">评分</option>
+              </select>
+            </label>
+          </header>
+          <ul class="wall">
+            {games.map((g, i) => (
+              <li
+                data-status={g.status ?? ''}
+                data-review={g.href && !g.external ? '' : undefined}
+                data-hours={g.hours ?? 0}
+                data-rating={g.rating ?? -1}
+                data-i={i}
+              >
+                <GameCard g={g} eager={!shelves.length && i < 10} />
+              </li>
+            ))}
+          </ul>
+          <p class="empty muted" hidden>
+            这一类还没有游戏。
+          </p>
+        </section>
+      ) : (
+        <p class="muted">还没有游戏。在 src/content/games/ 里建档，或者配置 Steam 同步（见 README）。</p>
+      )
+    }
+  </div>
+
+  <!-- 详情卡：点击任意海报打开 -->
+  <dialog class="gd" aria-labelledby="gd-title">
+    <div class="gd-hero" data-hero aria-hidden="true">
+      <img class="gd-hero-img" alt="" referrerpolicy="no-referrer" onerror={heroFail} />
+    </div>
+    <button class="gd-close" type="button" aria-label="关闭">
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+    </button>
+    <div class="gd-body">
+      <div class="gd-poster"><img alt="" referrerpolicy="no-referrer" /></div>
+      <div class="gd-info">
+        <div class="gd-head">
+          <p class="gd-kicker"></p>
+          <h2 id="gd-title"></h2>
         </div>
-        <ul class="wall">
-          {games.map((g, i) => (
-            <li
-              data-status={g.status ?? ''}
-              data-review={g.href && !g.external ? '' : undefined}
-              data-activity={g.activity?.valueOf() ?? 0}
-              data-hours={g.hours ?? 0}
-              data-rating={g.rating ?? -1}
-              data-i={i}
-            >
-              <GameCard g={g} eager={i < 10} vt />
-            </li>
-          ))}
-        </ul>
-        <p class="empty muted" hidden>这一类还没有游戏。</p>
-      </>
-    ) : (
-      <p class="muted">还没有游戏。在 src/content/games/ 里建档，或者配置 Steam 同步（见 README）。</p>
-    )
-  }
+        <p class="gd-desc"></p>
+        <dl class="gd-stats"></dl>
+        <p class="gd-actions">
+          <a class="btn primary gd-review">读评测</a>
+          <a class="btn gd-store" target="_blank" rel="noopener">Steam 商店页 ↗</a>
+        </p>
+      </div>
+    </div>
+  </dialog>
+
+  <script is:inline type="application/json" id="game-data" set:html={JSON.stringify(detail).replace(/</g, '\\u003c')} />
 </Base>
 
 <style>
+  /* 横向货架和顶部大图要伸到屏幕边缘，容器外的部分裁掉，避免出现横向滚动条 */
+  :global(body:has(.games-page)) {
+    overflow-x: clip;
+  }
+  .games-page {
+    --bleed: max(var(--gutter), calc((100vw - var(--wide)) / 2));
+  }
   .crumb {
-    margin: 0 0 0.4rem;
+    margin: 0 0 1.4rem;
     font-size: 0.875rem;
+    color: var(--muted);
   }
   .crumb a {
-    color: var(--muted);
+    color: inherit;
     text-decoration: none;
   }
-  .crumb a::after {
-    content: ' /';
-    opacity: 0.6;
+  .crumb a:hover {
+    color: var(--accent);
   }
-  .page-lede {
-    font-variant-numeric: tabular-nums;
-    margin-bottom: 2rem;
+
+  /* ---------- 顶部焦点区 ---------- */
+  .spot {
+    position: relative;
+    margin: -3rem calc(50% - 50vw) 0;
+    padding: 3rem var(--bleed) 3.5rem;
+    min-height: min(34rem, 72vh);
+    display: flex;
+    align-items: flex-end;
+    isolation: isolate;
   }
-  .toolbar {
+  @media (max-width: 34rem) {
+    .spot {
+      min-height: 26rem;
+      padding-bottom: 2rem;
+    }
+  }
+  .spot-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+  }
+  .spot-bg img,
+  .spot.no-hero .spot-bg::before {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 30%;
+    animation: drift 24s ease-in-out infinite alternate;
+  }
+  :global(:root[data-theme='dark']) .spot-bg img {
+    filter: brightness(0.78) saturate(0.95);
+  }
+  /* 没有横幅图：用竖版封面放大、模糊，铺成一片颜色 */
+  .spot.no-hero .spot-bg img {
+    display: none;
+  }
+  .spot.no-hero .spot-bg::before {
+    content: '';
+    background: var(--cover) center / cover;
+    filter: blur(48px) saturate(1.3);
+    opacity: 0.55;
+    transform: scale(1.2);
+    animation: none;
+  }
+  /* 左侧和底部渐隐到页面背景，文字落在渐隐区里 */
+  .spot-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(to top, var(--bg) 0%, color-mix(in srgb, var(--bg) 70%, transparent) 22%, transparent 55%),
+      linear-gradient(to right, color-mix(in srgb, var(--bg) 92%, transparent) 0%, color-mix(in srgb, var(--bg) 55%, transparent) 38%, transparent 72%),
+      linear-gradient(to bottom, color-mix(in srgb, var(--bg) 55%, transparent) 0%, transparent 25%);
+  }
+  @keyframes drift {
+    from {
+      transform: scale(1.08) translate3d(-1%, 0, 0);
+    }
+    to {
+      transform: scale(1.02) translate3d(1%, -1%, 0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spot-bg img {
+      animation: none;
+    }
+  }
+  .spot-inner {
+    max-width: 34rem;
+  }
+  .spot-inner > * {
+    animation: spot-in 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .spot-inner > :nth-child(2) {
+    animation-delay: 0.06s;
+  }
+  .spot-inner > :nth-child(3) {
+    animation-delay: 0.12s;
+  }
+  .spot-inner > :nth-child(4) {
+    animation-delay: 0.18s;
+  }
+  .spot-inner > :nth-child(n + 5) {
+    animation-delay: 0.24s;
+  }
+  @keyframes spot-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spot-inner > * {
+      animation: none;
+    }
+  }
+  .spot-kicker {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+  }
+  .spot-title {
+    margin: 0 0 0.9rem;
+    font-size: clamp(2.2rem, 5.5vw, 3.6rem);
+    line-height: 1.08;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .spot-meta {
+    margin: 0 0 1rem;
+    font-size: 0.9375rem;
+    color: var(--fg-soft);
+  }
+  .spot-meta [data-ago]:not(:empty)::before {
+    content: ' · ';
+  }
+  .spot-desc {
+    margin: 0 0 1.4rem;
+    color: var(--fg-soft);
+    line-height: 1.75;
+  }
+  .spot-actions,
+  .gd-actions {
     display: flex;
     flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 0;
+  }
+  .btn {
+    display: inline-flex;
     align-items: center;
-    gap: 0.75rem 1.5rem;
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
+    gap: 0.4em;
+    padding: 0.42rem 1rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    text-decoration: none;
+    color: var(--fg);
+    border: 1px solid color-mix(in srgb, var(--fg) 22%, transparent);
+    background: color-mix(in srgb, var(--bg) 40%, transparent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+  }
+  .btn:hover {
+    color: var(--fg);
+    border-color: color-mix(in srgb, var(--fg) 45%, transparent);
+  }
+  .btn.primary {
+    color: var(--bg);
+    background: var(--fg);
+    border-color: var(--fg);
+  }
+  .btn.primary:hover {
+    color: var(--bg);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .stats {
+    margin: 1.5rem 0 0;
+    font-size: 0.875rem;
+    color: var(--fg-soft);
+  }
+
+  /* ---------- 横向货架 ---------- */
+  .shelf {
+    margin-top: 2.75rem;
+  }
+  .shelf-head,
+  .toolbar {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .shelf-head h2,
+  .all-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-right: auto;
+  }
+  .shelf-head h2 .num {
+    margin-left: 0.5em;
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--muted);
+  }
+  .shelf-nav {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .shelf-nav button {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s, opacity 0.2s;
+  }
+  .shelf-nav button:hover {
+    color: var(--fg);
+    border-color: var(--muted);
+  }
+  .shelf-nav button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  @media (hover: none) {
+    .shelf-nav {
+      display: none;
+    }
+  }
+  .track {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: clamp(7.5rem, 22vw, 10.5rem);
+    gap: 1.25rem;
+    /* 伸到屏幕两侧，第一张仍和正文左对齐 */
+    margin-inline: calc(50% - 50vw);
+    padding: 0.75rem var(--bleed) 1.25rem;
+    scroll-padding-inline: var(--bleed);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .track::-webkit-scrollbar {
+    display: none;
+  }
+  .track > :global(*) {
+    scroll-snap-align: start;
+  }
+
+  /* ---------- 全部 ---------- */
+  .all {
+    margin-top: 3.5rem;
+  }
+  .toolbar {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 1.5rem;
+    padding-bottom: 0.9rem;
+    margin-bottom: 1.75rem;
     border-bottom: 1px solid var(--border);
+  }
+  .all-title {
+    margin-right: 0;
   }
   .filters {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem 1.2rem;
+    gap: 0.3rem 1.1rem;
     margin-right: auto;
   }
   .filters button,
   .sort select {
     appearance: none;
     font: inherit;
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
     color: var(--muted);
     background: none;
     border: 0;
@@ -155,9 +534,284 @@ const totalHours = Math.round(games.reduce((t, g) => t + (g.hours ?? 0), 0));
   .wall li[hidden] {
     display: none;
   }
+
+  /* ---------- 详情卡 ---------- */
+  .gd {
+    width: min(46rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - 2rem);
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--fg);
+    background: var(--bg);
+    box-shadow: 0 40px 80px -30px rgb(0 0 0 / 0.6);
+    overflow: hidden auto;
+    overscroll-behavior: contain;
+  }
+  .gd::backdrop {
+    background: rgb(10 9 8 / 0.55);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+    backdrop-filter: blur(10px) saturate(1.2);
+  }
+  .gd[open] {
+    view-transition-name: gd-panel;
+  }
+  .gd-hero {
+    position: relative;
+    aspect-ratio: 3.1 / 1;
+    overflow: hidden;
+    background: var(--bg-soft);
+  }
+  .gd-hero img,
+  .gd-hero.no-hero::before {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .gd-hero.no-hero img {
+    display: none;
+  }
+  .gd-hero.no-hero::before {
+    content: '';
+    background: var(--cover) center / cover;
+    filter: blur(36px) saturate(1.3);
+    opacity: 0.6;
+    transform: scale(1.3);
+  }
+  .gd-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, var(--bg) 0%, transparent 70%);
+  }
+  .gd-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 0;
+    color: #f3ece0;
+    background: rgb(20 18 16 / 0.55);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+  }
+  .gd-close:hover {
+    background: rgb(20 18 16 / 0.8);
+  }
+  .gd-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: 9.5rem minmax(0, 1fr);
+    gap: 1.75rem;
+    padding: 0 1.75rem 1.75rem;
+    margin-top: -5.5rem;
+  }
+  .gd-poster {
+    aspect-ratio: 2 / 3;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg-soft);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.08),
+      0 18px 36px -14px rgb(0 0 0 / 0.6);
+  }
+  .gd-poster img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .gd-poster.wide img {
+    object-fit: contain;
+  }
+  .gd-info {
+    padding-top: 5.75rem;
+    min-width: 0;
+  }
+  .gd-kicker {
+    margin: 0 0 0.35rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+  }
+  .gd h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1.75rem;
+    line-height: 1.2;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+  .gd-desc {
+    margin: 0 0 1.2rem;
+    color: var(--fg-soft);
+    line-height: 1.75;
+  }
+  .gd-desc:empty {
+    display: none;
+  }
+  .gd-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+    gap: 1rem 1.25rem;
+    margin: 0 0 1.5rem;
+  }
+  .gd-stats :global(dt) {
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .gd-stats :global(dd) {
+    margin: 0.1rem 0 0;
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .gd-stats :global(.bar) {
+    display: block;
+    height: 2px;
+    margin-top: 0.45rem;
+    border-radius: 1px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .gd-stats :global(.bar i) {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transform-origin: 0 50%;
+    animation: bar-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.2s both;
+  }
+  @keyframes bar-in {
+    from {
+      transform: scaleX(0);
+    }
+  }
+  .gd-actions .btn[hidden] {
+    display: none;
+  }
+  @media (max-width: 34rem) {
+    .gd-body {
+      grid-template-columns: 6rem minmax(0, 1fr);
+      grid-template-areas: 'poster head' 'desc desc' 'stats stats' 'actions actions';
+      gap: 0 1rem;
+      padding: 0 1.1rem 1.4rem;
+      margin-top: -3rem;
+    }
+    .gd-info {
+      display: contents;
+    }
+    .gd-poster {
+      grid-area: poster;
+      margin-bottom: 1.2rem;
+    }
+    .gd-head {
+      grid-area: head;
+      align-self: end;
+      margin-bottom: 1.2rem;
+    }
+    .gd h2 {
+      font-size: 1.3rem;
+      margin: 0;
+    }
+    .gd-desc {
+      grid-area: desc;
+    }
+    .gd-stats {
+      grid-area: stats;
+    }
+    .gd-actions {
+      grid-area: actions;
+    }
+  }
+
+  /* 打开/关闭详情卡的过渡：海报从墙上飞进卡片，卡片本身淡入并轻微放大 */
+  :global(:root.gd-vt::view-transition-old(root)),
+  :global(:root.gd-vt::view-transition-new(root)) {
+    animation: none;
+  }
+  :global(::view-transition-group(gd-poster)) {
+    animation-duration: 0.45s;
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  :global(::view-transition-new(gd-panel)) {
+    animation: gd-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  :global(::view-transition-old(gd-panel)) {
+    animation: gd-out 0.25s ease-in both;
+  }
+  :global(::view-transition-old(gd-poster)),
+  :global(::view-transition-new(gd-poster)) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  @keyframes gd-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.97);
+    }
+  }
+  @keyframes gd-out {
+    to {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+  }
 </style>
 
 <script>
+  type Detail = {
+    title: string;
+    cover?: string;
+    coverFallback?: string;
+    hero?: string;
+    status?: string;
+    platform?: string;
+    rating?: number;
+    hours?: string;
+    ach?: [number, number];
+    last?: number;
+    finished?: string;
+    desc?: string;
+    review?: string;
+    store?: string;
+  };
+  const data: Record<string, Detail> = JSON.parse(document.getElementById('game-data')?.textContent || '{}');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const canVT = !!document.startViewTransition && !reduce;
+
+  const ago = (t?: number) => {
+    if (!t) return '';
+    const d = Math.floor((Date.now() - t) / 864e5);
+    return d < 1 ? '今天玩过' : d < 30 ? `${d} 天前玩过` : d < 365 ? `${Math.floor(d / 30)} 个月前玩过` : `${Math.floor(d / 365)} 年前玩过`;
+  };
+  document.querySelectorAll<HTMLElement>('[data-ago]').forEach((el) => (el.textContent = ago(Number(el.dataset.ago))));
+
+  // ---------- 货架左右翻页 ----------
+  document.querySelectorAll<HTMLElement>('.shelf').forEach((shelf) => {
+    const track = shelf.querySelector<HTMLElement>('.track')!;
+    const [prev, next] = shelf.querySelectorAll<HTMLButtonElement>('.shelf-nav button');
+    const update = () => {
+      prev.disabled = track.scrollLeft < 4;
+      next.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 4;
+    };
+    shelf.querySelectorAll<HTMLButtonElement>('.shelf-nav button').forEach((b) =>
+      b.addEventListener('click', () => {
+        track.scrollBy({ left: Number(b.dataset.dir) * track.clientWidth * 0.8, behavior: reduce ? 'auto' : 'smooth' });
+      }),
+    );
+    track.addEventListener('scroll', update, { passive: true });
+    update();
+  });
+
+  // ---------- 筛选和排序 ----------
   const wall = document.querySelector<HTMLUListElement>('.wall');
   const buttons = [...document.querySelectorAll<HTMLButtonElement>('.filters button')];
   const select = document.querySelector<HTMLSelectElement>('.sort select');
@@ -180,11 +834,22 @@ const totalHours = Math.round(games.reduce((t, g) => t + (g.hours ?? 0), 0));
       }
       if (empty) empty.hidden = shown > 0;
     };
-    // 筛选/排序时卡片平滑换位（支持 View Transitions 的浏览器）
+    // 换位时卡片平滑移动（只给视口里的卡片命名，卡片多时也不卡）
     const run = () => {
-      if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) return apply();
-      items.forEach((li, i) => (li.style.viewTransitionName = `wall-${i}`));
-      document.startViewTransition(apply).finished.finally(() => items.forEach((li) => (li.style.viewTransitionName = '')));
+      if (!canVT) return apply();
+      const vh = innerHeight;
+      const named = items.filter((li) => {
+        if (li.hidden) return false;
+        const r = li.getBoundingClientRect();
+        return r.bottom > -200 && r.top < vh + 200;
+      });
+      named.forEach((li, i) => (li.style.viewTransitionName = `wall-${li.dataset.i ?? i}`));
+      document.startViewTransition(() => {
+        apply();
+        items.forEach((li) => {
+          if (!li.hidden && !li.style.viewTransitionName) li.style.viewTransitionName = `wall-${li.dataset.i}`;
+        });
+      }).finished.finally(() => items.forEach((li) => (li.style.viewTransitionName = '')));
     };
     buttons.forEach((b) =>
       b.addEventListener('click', () => {
@@ -195,4 +860,129 @@ const totalHours = Math.round(games.reduce((t, g) => t + (g.hours ?? 0), 0));
     );
     select?.addEventListener('change', run);
   }
+
+  // ---------- 详情卡 ----------
+  const dlg = document.querySelector<HTMLDialogElement>('dialog.gd')!;
+  const $ = <T extends Element>(s: string) => dlg.querySelector<T>(s)!;
+  const posterBox = $<HTMLElement>('.gd-poster');
+  const posterImg = $<HTMLImageElement>('.gd-poster img');
+  const heroBox = $<HTMLElement>('.gd-hero');
+  const heroImg = $<HTMLImageElement>('.gd-hero img');
+  let origin: HTMLImageElement | null = null;
+
+  posterImg.addEventListener('error', () => {
+    const f = posterImg.dataset.fallback;
+    if (f) {
+      posterImg.removeAttribute('data-fallback');
+      posterImg.src = f;
+      posterBox.classList.add('wide');
+    }
+  });
+
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  function fill(slug: string) {
+    const d = data[slug];
+    dlg.style.setProperty('--cover', d.cover ? `url("${d.cover}")` : 'none');
+    posterBox.classList.remove('wide');
+    posterImg.removeAttribute('data-fallback');
+    if (d.coverFallback) posterImg.dataset.fallback = d.coverFallback;
+    posterImg.src = d.cover ?? '';
+    posterBox.hidden = !d.cover;
+    heroBox.classList.toggle('no-hero', !d.hero);
+    if (d.hero) heroImg.src = d.hero;
+    else heroImg.removeAttribute('src');
+    $('.gd-kicker').textContent = [d.status, d.platform].filter(Boolean).join(' · ');
+    $('#gd-title').textContent = d.title;
+    $('.gd-desc').textContent = d.desc ?? '';
+    const pct = d.ach && d.ach[1] > 0 ? d.ach[0] / d.ach[1] : undefined;
+    const rows: [string, string][] = [];
+    if (d.rating != null) rows.push(['评分', `${d.rating.toFixed(1)} / 10`]);
+    if (d.hours) rows.push(['时长', esc(d.hours)]);
+    if (pct != null) rows.push(['成就', `${d.ach![0]} / ${d.ach![1]}<span class="bar"><i style="transform:scaleX(${pct})"></i></span>`]);
+    if (d.last) rows.push(['上次游玩', esc(ago(d.last).replace('玩过', ''))]);
+    if (d.finished) rows.push(['通关', esc(d.finished)]);
+    $('.gd-stats').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+    const review = $<HTMLAnchorElement>('.gd-review');
+    const store = $<HTMLAnchorElement>('.gd-store');
+    review.hidden = !d.review;
+    if (d.review) review.href = d.review;
+    store.hidden = !d.store;
+    if (d.store) store.href = d.store;
+    store.classList.toggle('primary', !d.review);
+  }
+
+  const visible = (el: Element | null) => {
+    const r = el?.getBoundingClientRect();
+    return !!r && r.height > 0 && r.bottom > 0 && r.top < innerHeight;
+  };
+
+  function open(slug: string, from?: HTMLElement | null) {
+    if (!data[slug]) return;
+    origin = from?.querySelector<HTMLImageElement>('.poster img') ?? null;
+    // 原海报不在视口里（比如从顶部「详情」按钮打开）就不做飞入，只让卡片淡入
+    if (!visible(origin)) origin = null;
+    const show = () => {
+      fill(slug);
+      if (!dlg.open) dlg.showModal();
+      if (origin) origin.style.viewTransitionName = '';
+      posterBox.style.viewTransitionName = origin ? 'gd-poster' : '';
+      history.replaceState(null, '', `#${encodeURIComponent(slug)}`);
+    };
+    if (!canVT || dlg.open) return show();
+    if (origin) origin.style.viewTransitionName = 'gd-poster';
+    document.documentElement.classList.add('gd-vt');
+    document.startViewTransition(show).finished.finally(() => document.documentElement.classList.remove('gd-vt'));
+  }
+
+  function close() {
+    const done = () => {
+      dlg.close();
+      posterBox.style.viewTransitionName = '';
+      if (origin) origin.style.viewTransitionName = 'gd-poster';
+    };
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!canVT) return done();
+    // 关闭时海报飞回原来的位置（原海报不在视口里就只做淡出）
+    if (!visible(origin)) origin = null;
+    posterBox.style.viewTransitionName = origin ? 'gd-poster' : '';
+    document.documentElement.classList.add('gd-vt');
+    document
+      .startViewTransition(done)
+      .finished.finally(() => {
+        if (origin) origin.style.viewTransitionName = '';
+        document.documentElement.classList.remove('gd-vt');
+      });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const t = e.target as Element;
+    const card = t.closest<HTMLElement>('a.game[data-game], [data-open]');
+    if (!card || dlg.contains(card)) return;
+    const slug = card.dataset.game ?? card.dataset.open!;
+    if (!data[slug]) return;
+    e.preventDefault();
+    open(slug, card.matches('a.game') ? card : document.querySelector<HTMLElement>(`a.game[data-game="${CSS.escape(slug)}"]`));
+  });
+  $('.gd-close').addEventListener('click', close);
+  // 点对话框外面（backdrop）关闭
+  dlg.addEventListener('click', (e) => {
+    if (e.target === dlg) {
+      const r = dlg.getBoundingClientRect();
+      const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      if (!inside) close();
+    }
+  });
+  dlg.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    close();
+  });
+
+  // 从生活页或分享链接进来：/games/#艾尔登法环 直接打开那一款
+  const openFromHash = () => {
+    const slug = decodeURIComponent(location.hash.slice(1));
+    if (slug && data[slug]) open(slug, null);
+  };
+  openFromHash();
+  addEventListener('hashchange', openFromHash);
 </script>
