@@ -1,5 +1,6 @@
 // 线稿地球仪：Canvas 2D 手绘风场景，可拖动旋转、带惯性，颜色跟随站点主题。
-// 静态部分（星点、光晕、地面、柏树、台座、球面阴影）预渲染到离屏画布，每帧只重画经纬网、星环和闪烁的星星。
+// 静态部分（星空、银河、太阳、月亮、球面阴影）预渲染到离屏画布，每帧只重画经纬网、大陆轮廓、星环和闪烁的星星。
+import { LAND } from './land';
 
 type Mat = number[]; // 3×3，行主序
 type RGB = [number, number, number];
@@ -48,26 +49,39 @@ function hatch(g: CanvasRenderingContext2D, x0: number, y0: number, x1: number, 
   g.stroke();
 }
 
-// 经纬网：本体坐标，北极为 +y
+// 经纬网和大陆轮廓：本体坐标，北极为 +y
 const D = Math.PI / 180;
 const sph = (lat: number, lon: number) => [Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon)];
-function graticule() {
-  const lines: { pts: number[][]; accent?: boolean }[] = [];
+type Line = { pts: number[][]; kind: 'grid' | 'accent' | 'land' };
+function lines(): Line[] {
+  const out: Line[] = [];
   for (let lon = 0; lon < 360; lon += 20) {
     const pts = [];
     for (let lat = -90; lat <= 90; lat += 3) pts.push(sph(lat * D, lon * D));
-    lines.push({ pts, accent: lon === 0 });
+    out.push({ pts, kind: lon === 0 ? 'accent' : 'grid' });
   }
   for (let lat = -60; lat <= 60; lat += 20) {
     const pts = [];
     for (let lon = 0; lon <= 360; lon += 3) pts.push(sph(lat * D, lon * D));
-    lines.push({ pts });
+    out.push({ pts, kind: 'grid' });
   }
-  return lines;
+  // 数据在 ±180° 经线处被切开，切口不是真实海岸线，遇到就断开
+  for (const ring of LAND) {
+    let pts: number[][] = [];
+    for (let i = 0; i < ring.length; i += 2) {
+      const lon = ring[i] / 2, lat = ring[i + 1] / 2;
+      if (pts.length && Math.abs(lon) >= 179.5 && Math.abs(ring[i - 2] / 2) >= 179.5) {
+        if (pts.length > 1) out.push({ pts, kind: 'land' });
+        pts = [];
+      }
+      pts.push(sph(lat * D, lon * D));
+    }
+    if (pts.length > 1) out.push({ pts, kind: 'land' });
+  }
+  return out;
 }
 
-// 光从左上前方照来（世界坐标，y 向上）
-const L = (() => { const v = [-0.62, 0.5, 0.42]; const n = Math.hypot(...v); return v.map((x) => x / n); })();
+const norm = (v: number[]) => { const n = Math.hypot(...v) || 1; return v.map((x) => x / n); };
 
 export function mountGlobe(wrap: HTMLElement) {
   const canvas = wrap.querySelector('canvas')!;
@@ -75,12 +89,14 @@ export function mountGlobe(wrap: HTMLElement) {
   const ctx = canvas.getContext('2d')!;
   const root = document.documentElement;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-  const GRID = graticule();
+  const LINES = lines();
 
-  let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, R = 0, G = 0;
+  let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, R = 0;
+  let sun = { x: 0, y: 0, r: 0 }, moon = { x: 0, y: 0, r: 0 };
+  let L = [-0.6, 0.5, 0.4]; // 光照方向（世界坐标，y 向上），由太阳位置决定
   let bg: RGB = [0, 0, 0], fg: RGB = [255, 255, 255], accent: RGB = [255, 200, 0];
   const css = (c: RGB, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
-  let back: HTMLCanvasElement, fore: HTMLCanvasElement, shade: HTMLCanvasElement;
+  let back: HTMLCanvasElement, shade: HTMLCanvasElement;
   let sparkles: { x: number; y: number; s: number; w: number; p: number }[] = [];
 
   // 初始姿态：北极朝观众倾 20°、向左偏 26°
@@ -123,125 +139,27 @@ export function mountGlobe(wrap: HTMLElement) {
     W = wrap.clientWidth; H = wrap.clientHeight;
     dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-    G = H * 0.8;
-    R = Math.min(H * 0.22, W * 0.2);
-    cx = W / 2; cy = G - 2.02 * R;
+    R = Math.min(H * 0.3, W * 0.21);
+    cx = W / 2; cy = H * 0.5;
+    // 太阳在左上，月亮在右下；窄屏时往角落收
+    const sr = Math.max(14, R * 0.26), mr = Math.max(12, R * 0.22);
+    sun = { x: Math.max(sr * 2.3, Math.min(cx - 2.25 * R, W * 0.16)), y: Math.max(sr * 2.3, H * 0.2), r: sr };
+    moon = { x: Math.min(W - mr * 2, Math.max(cx + 2.3 * R, W * 0.84)), y: Math.min(H - mr * 2.2, H * 0.78), r: mr };
+    if (W < 560) { sun.y = sr * 2; moon.y = H - mr * 1.8; }
+    L = norm([sun.x - cx, -(sun.y - cy), Math.hypot(sun.x - cx, sun.y - cy) * 0.75]);
     const hs = R * 2.3;
     Object.assign(handle.style, { left: `${cx - hs / 2}px`, top: `${cy - hs / 2}px`, width: `${hs}px`, height: `${hs}px` });
   }
 
   // ---------- 静态图层 ----------
-  function buildBack() {
-    const [c, g] = layer();
-    const r = rng(7);
-    const n = Math.round((W * G) / 2400);
-    for (let i = 0; i < n; i++) {
-      const x = r() * W, y = r() * (G - 6), s = 0.35 + r() * r() * 1.1;
-      g.fillStyle = css(fg, 0.2 + r() * 0.6);
-      g.beginPath(); g.arc(x, y, s, 0, 7); g.fill();
-    }
-    sparkles = [];
-    for (let i = 0; i < 9; i++) sparkles.push({ x: r() * W, y: r() * (G - 30) + 6, s: 3 + r() * 4, w: 0.0008 + r() * 0.0016, p: r() * 7 });
-
-    // 球后的排线光晕，略偏左上
-    g.save();
-    g.beginPath(); g.arc(cx - 0.3 * R, cy - 0.26 * R, 1.06 * R, 0, 7); g.clip();
-    g.strokeStyle = css(fg, 0.42); g.lineWidth = 0.7;
-    hatch(g, cx - 1.5 * R, cy - 1.5 * R, cx + 1.2 * R, cy + 1.2 * R, 3.2, '\\');
-    g.restore();
-    back = c;
-  }
-
-  function cypress(g: CanvasRenderingContext2D, x: number, h: number, w: number) {
-    const y = G + (x - cx) * -0.012; // 地平线略向右上倾
-    const shape = new Path2D();
-    const N = 24;
-    for (let i = 0; i <= N; i++) {
-      const s = 1 - i / N; // 1=底，0=顶
-      const hw = (w / 2) * Math.pow(s, 0.75) * (1 - 0.35 * Math.pow(s, 6));
-      shape.lineTo(x - hw, y - (1 - s) * h);
-    }
-    for (let i = N; i >= 0; i--) {
-      const s = 1 - i / N;
-      const hw = (w / 2) * Math.pow(s, 0.75) * (1 - 0.35 * Math.pow(s, 6));
-      shape.lineTo(x + hw, y - (1 - s) * h);
-    }
-    shape.closePath();
-    g.fillStyle = css(bg); g.fill(shape);
-    g.save(); g.clip(shape);
-    g.strokeStyle = css(fg, 0.6); g.lineWidth = 0.7;
-    hatch(g, x - w, y - h, x + w, y, 2.6, '/');
-    g.restore();
-    g.strokeStyle = css(fg, 0.95); g.lineWidth = 1.1; g.stroke(shape);
-  }
-
-  function buildFore() {
-    const [c, g] = layer();
-    const r = rng(11);
-    const hy = (x: number) => G + (x - cx) * -0.012;
-
-    // 地面：竖向短线做质感，两条起伏的等高线
-    g.fillStyle = css(bg);
-    g.beginPath(); g.moveTo(0, hy(0)); g.lineTo(W, hy(W)); g.lineTo(W, H); g.lineTo(0, H); g.fill();
-    g.lineWidth = 0.7;
-    const n = Math.round((W * (H - G)) / 38);
-    for (let i = 0; i < n; i++) {
-      const x = r() * W, top = hy(x) + 2, y = top + r() * (H - top);
-      const len = 5 + r() * (6 + (y - top) * 0.25);
-      g.strokeStyle = css(fg, 0.18 + r() * 0.45);
-      g.beginPath(); g.moveTo(x, y); g.lineTo(x - len * 0.06, Math.min(H, y + len)); g.stroke();
-    }
-    for (const f of [0.38, 0.74]) {
-      g.strokeStyle = css(fg, 0.45); g.lineWidth = 0.8;
-      g.beginPath();
-      for (let x = 0; x <= W; x += 6) {
-        const y = hy(x) + f * (H - G) + Math.sin(x * 0.013 + f * 9) * 2.2 + Math.sin(x * 0.041 + f * 3) * 1.1;
-        x === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
-      }
-      g.stroke();
-    }
-    g.strokeStyle = css(fg, 0.9); g.lineWidth = 1.2;
-    g.beginPath(); g.moveTo(0, hy(0)); g.lineTo(W, hy(W)); g.stroke();
-
-    // 柏树：位置以球半径为单位，放不下的就不画
-    const trees: [number, number, number][] = [
-      [-1.62, 1.4, 0.26], [-1.22, 1.85, 0.3], [2.1, 1.6, 0.27], [2.5, 1.2, 0.22],
-      [-2.9, 1.0, 0.2], [3.25, 0.85, 0.18], [-3.6, 1.3, 0.24],
-    ];
-    for (const [dx, h, w] of trees) {
-      const x = cx + dx * R;
-      if (x - w * R < 4 || x + w * R > W - 4) continue;
-      cypress(g, x, h * R, w * R);
-    }
-
-    // 台座：顶板 + 柱身，右侧凹槽表示背光面
-    const slabW = 0.95 * R, slabH = 0.075 * R, slabY = cy + R * 1.025;
-    const colW = 0.64 * R, colY = slabY + slabH, colH = hy(cx) - colY;
-    g.lineWidth = 1.2; g.strokeStyle = css(fg, 0.95); g.fillStyle = css(bg);
-    g.beginPath(); g.rect(cx - 0.05 * R, cy + R * 0.99, 0.1 * R, slabY - cy - R * 0.99); g.fill(); g.stroke();
-    g.beginPath(); g.rect(cx - colW / 2, colY, colW, colH); g.fill(); g.stroke();
-    g.save();
-    g.beginPath(); g.rect(cx + colW * 0.06, colY, colW * 0.44, colH); g.clip();
-    g.strokeStyle = css(fg, 0.6); g.lineWidth = 0.7;
-    hatch(g, cx + colW * 0.06 + 1.5, colY, cx + colW / 2, colY + colH, 2.4, '|');
-    g.restore();
-    g.beginPath(); g.rect(cx - slabW / 2, slabY, slabW, slabH); g.fill(); g.stroke();
-
-    // 底部淡出到页面背景
-    const fade = g.createLinearGradient(0, H * 0.86, 0, H);
-    fade.addColorStop(0, css(bg, 0)); fade.addColorStop(1, css(bg, 1));
-    g.fillStyle = fade; g.fillRect(0, H * 0.86, W, H * 0.14 + 1);
-    fore = c;
-  }
-
-  // 球面阴影：先画满排线，再按每个像素的 n·L 把亮面擦掉
-  function buildShade() {
-    const size = 2 * R + 4, o = R + 2;
+  // 球体明暗：先画满排线，再按每个像素的 n·L 把亮面擦掉。返回边长 2r+4 的贴图
+  function shadeSprite(r: number, light: number[], gapA: number, gapB: number) {
+    const size = 2 * r + 4, o = r + 2;
     const make = (dir: '\\' | '/', gap: number, alpha: number, lo: number, hi: number) => {
       const [c, g] = layer(size, size);
       g.strokeStyle = css(fg, alpha); g.lineWidth = 0.75;
       hatch(g, 0, 0, size, size, gap, dir);
-      const img = g.getImageData(0, 0, c.width, c.height), d = img.data, k = R * dpr;
+      const img = g.getImageData(0, 0, c.width, c.height), d = img.data, k = r * dpr;
       for (let py = 0; py < c.height; py++) {
         const Y = (py + 0.5 - o * dpr) / k;
         for (let px = 0; px < c.width; px++) {
@@ -249,22 +167,91 @@ export function mountGlobe(wrap: HTMLElement) {
           if (!d[i]) continue;
           const X = (px + 0.5 - o * dpr) / k, d2 = X * X + Y * Y;
           if (d2 >= 1) { d[i] = 0; continue; }
-          const l = X * L[0] - Y * L[1] + Math.sqrt(1 - d2) * L[2];
+          const l = X * light[0] - Y * light[1] + Math.sqrt(1 - d2) * light[2];
           d[i] *= smooth(lo, hi, l) * clamp01((1 - Math.sqrt(d2)) * k);
         }
       }
       g.putImageData(img, 0, 0);
       return c;
     };
-    const a = make('\\', 3.0, 0.7, 0.16, -0.06);
-    const b = make('/', 3.6, 0.5, -0.3, -0.55);
-    a.getContext('2d')!.drawImage(b, 0, 0);
-    shade = a;
+    const a = make('\\', gapA, 0.7, 0.16, -0.06);
+    a.getContext('2d')!.drawImage(make('/', gapB, 0.5, -0.3, -0.55), 0, 0);
+    return a;
+  }
+
+  function buildBack() {
+    const [c, g] = layer();
+    const r = rng(7);
+
+    // 银河：沿一条斜带高斯分布的细小星点
+    const ang = -0.38, ux = Math.cos(ang), uy = Math.sin(ang), span = Math.hypot(W, H);
+    const gauss = () => (r() + r() + r() + r() - 2) / 2;
+    const nm = Math.round((W * H) / 260);
+    for (let i = 0; i < nm; i++) {
+      const t = (r() - 0.5) * span, off = gauss() * H * 0.16 + Math.sin(t * 0.008) * H * 0.04;
+      const x = W / 2 + ux * t - uy * off, y = H * 0.55 + uy * t + ux * off;
+      if (x < 0 || x > W || y < 0 || y > H) continue;
+      g.fillStyle = css(fg, (0.08 + r() * 0.25) * (1 - Math.min(1, Math.abs(off) / (H * 0.32))));
+      g.fillRect(x, y, 0.8, 0.8);
+    }
+    // 普通星点：多数很暗，少数亮一些
+    const n = Math.round((W * H) / 1500);
+    for (let i = 0; i < n; i++) {
+      const x = r() * W, y = r() * H, b = r() ** 3, s = 0.35 + b * 1.25;
+      g.fillStyle = css(fg, 0.2 + b * 0.7 + r() * 0.1);
+      g.beginPath(); g.arc(x, y, s, 0, 7); g.fill();
+    }
+    // 几个星座样的连线，很淡
+    for (let k = 0; k < 3; k++) {
+      let x = r() * W, y = r() * H * 0.9;
+      g.strokeStyle = css(fg, 0.16); g.lineWidth = 0.6; g.setLineDash([2, 3]);
+      g.beginPath(); g.moveTo(x, y);
+      const pts = [[x, y]];
+      for (let j = 0; j < 4; j++) { x += (r() - 0.3) * 60; y += (r() - 0.5) * 50; g.lineTo(x, y); pts.push([x, y]); }
+      g.stroke(); g.setLineDash([]);
+      for (const [px, py] of pts) { g.fillStyle = css(fg, 0.85); g.beginPath(); g.arc(px, py, 1.3, 0, 7); g.fill(); }
+    }
+    sparkles = [];
+    for (let i = 0; i < 10; i++) sparkles.push({ x: r() * W, y: r() * H, s: 3 + r() * 4, w: 0.0008 + r() * 0.0016, p: r() * 7 });
+
+    // 太阳：几圈淡淡的光晕、长短交替的光芒、排线填充的日面
+    const { x: sx, y: sy, r: sr } = sun;
+    g.strokeStyle = css(fg, 0.12); g.lineWidth = 0.8;
+    for (const k of [2.05, 2.5]) { g.beginPath(); g.arc(sx, sy, sr * k, 0, 7); g.stroke(); }
+    g.strokeStyle = css(fg, 0.8); g.lineWidth = 1;
+    g.beginPath();
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2, l = i % 2 ? 1.45 : 1.8;
+      g.moveTo(sx + Math.cos(a) * sr * 1.22, sy + Math.sin(a) * sr * 1.22);
+      g.lineTo(sx + Math.cos(a) * sr * l, sy + Math.sin(a) * sr * l);
+    }
+    g.stroke();
+    g.fillStyle = css(bg); g.beginPath(); g.arc(sx, sy, sr, 0, 7); g.fill();
+    g.save(); g.clip();
+    g.strokeStyle = css(fg, 0.35); g.lineWidth = 0.7;
+    hatch(g, sx - sr, sy - sr, sx + sr, sy + sr, 2.6, '|');
+    g.restore();
+    g.strokeStyle = css(fg, 0.95); g.lineWidth = 1.4;
+    g.beginPath(); g.arc(sx, sy, sr, 0, 7); g.stroke();
+    g.lineWidth = 0.9; g.beginPath(); g.arc(sx, sy, sr * 0.62, 0, 7); g.stroke();
+
+    // 月亮：被同一个太阳照亮，所以亮面朝向太阳；加几个环形山
+    const { x: mx, y: my, r: mr } = moon;
+    const ml = norm([sun.x - mx, -(sun.y - my), Math.hypot(sun.x - mx, sun.y - my) * -1.1]); // 太阳在月亮后方，看到的是弦月
+    g.fillStyle = css(bg); g.beginPath(); g.arc(mx, my, mr, 0, 7); g.fill();
+    g.strokeStyle = css(fg, 0.55); g.lineWidth = 0.8;
+    for (const [dx, dy, cr] of [[-0.35, -0.3, 0.2], [0.2, 0.35, 0.14], [-0.05, 0.05, 0.1], [0.4, -0.25, 0.09]]) {
+      g.beginPath(); g.ellipse(mx + dx * mr, my + dy * mr, cr * mr, cr * mr * 0.85, 0.3, 0, 7); g.stroke();
+    }
+    g.drawImage(shadeSprite(mr, ml, 2.2, 2.6), mx - mr - 2, my - mr - 2, 2 * mr + 4, 2 * mr + 4);
+    g.strokeStyle = css(fg, 0.95); g.lineWidth = 1.2;
+    g.beginPath(); g.arc(mx, my, mr, 0, 7); g.stroke();
+    back = c;
   }
 
   function rebuild() {
     if (!W || !H) return;
-    readColors(); buildBack(); buildFore(); buildShade();
+    readColors(); buildBack(); shade = shadeSprite(R, L, 3.0, 3.6);
   }
 
   // ---------- 每帧 ----------
@@ -276,9 +263,9 @@ export function mountGlobe(wrap: HTMLElement) {
   };
 
   function drawGrid() {
-    const paths = [new Path2D(), new Path2D()]; // 普通线 / 本初子午线
-    for (const line of GRID) {
-      const path = paths[line.accent ? 1 : 0];
+    const paths = { grid: new Path2D(), accent: new Path2D(), land: new Path2D() };
+    for (const line of LINES) {
+      const path = paths[line.kind];
       let prev = proj(line.pts[0]), pen = false;
       if (prev[2] >= 0) { path.moveTo(prev[0], prev[1]); pen = true; }
       for (let i = 1; i < line.pts.length; i++) {
@@ -293,8 +280,9 @@ export function mountGlobe(wrap: HTMLElement) {
         prev = cur;
       }
     }
-    ctx.lineWidth = 0.9; ctx.strokeStyle = css(fg, 0.72); ctx.stroke(paths[0]);
-    ctx.lineWidth = 1.3; ctx.strokeStyle = css(accent, 0.95); ctx.stroke(paths[1]);
+    ctx.lineWidth = 0.7; ctx.strokeStyle = css(fg, 0.38); ctx.stroke(paths.grid);
+    ctx.lineWidth = 1.1; ctx.strokeStyle = css(accent, 0.8); ctx.stroke(paths.accent);
+    ctx.lineWidth = 1.25; ctx.strokeStyle = css(fg, 0.95); ctx.stroke(paths.land);
   }
 
   // 星环在赤道面上，双线环带；front=true 画前半圈，否则画后半圈
@@ -304,9 +292,12 @@ export function mountGlobe(wrap: HTMLElement) {
     for (let i = 0; i <= N; i++) { const a = (i / N) * Math.PI * 2; const p = [Math.cos(a), 0, Math.sin(a)]; pts.push([proj(p, r0), proj(p, r1)]); }
     const runs: number[][][][] = [];
     let run: number[][][] | null = null;
-    for (const q of pts) {
-      if ((q[0][2] >= 0) === front) { (run ??= []).push(q); } else if (run) { runs.push(run); run = null; }
-    }
+    // 每段两端各多带一个点，前后两半在交界处接上，不留缺口
+    const on = pts.map((q) => (q[0][2] >= 0) === front);
+    pts.forEach((q, i) => {
+      const keep = on[i] || on[(i + 1) % (N + 1)] || on[(i + N) % (N + 1)];
+      if (keep) (run ??= []).push(q); else if (run) { runs.push(run); run = null; }
+    });
     if (run) runs.push(run);
     // 首尾相接的情况：把最后一段并到第一段前面
     if (runs.length > 1 && (pts[0][0][2] >= 0) === front && (pts[N][0][2] >= 0) === front) runs[0] = runs.pop()!.concat(runs[0]);
@@ -355,7 +346,6 @@ export function mountGlobe(wrap: HTMLElement) {
     drawGrid();
     ctx.strokeStyle = css(fg, 1); ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
-    ctx.drawImage(fore, 0, 0, W, H);
     drawRing(true);
   }
 
@@ -381,7 +371,7 @@ export function mountGlobe(wrap: HTMLElement) {
         if (meteor.life <= 0) meteor = null;
       } else if ((nextMeteor -= dt) <= 0) {
         const r = Math.random(), dir = r < 0.5 ? 1 : -1;
-        meteor = { x: W * (0.15 + 0.7 * Math.random()), y: G * (0.05 + 0.3 * Math.random()), vx: 0.32 * dir, vy: 0.12, life: 1 };
+        meteor = { x: W * (0.15 + 0.7 * Math.random()), y: H * (0.05 + 0.4 * Math.random()), vx: 0.32 * dir, vy: 0.12, life: 1 };
         nextMeteor = 9000 + Math.random() * 14000;
       }
     }
