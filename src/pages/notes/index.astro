@@ -1,6 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { getNotes, getSeries, seriesIdOf, titleOf, fmtDate } from '../../lib/content';
+import { getNotes, getSeries, seriesIdOf, titleOf, fmtDate, vtStyle } from '../../lib/content';
 
 const series = await getSeries();
 const loose = (await getNotes())
@@ -18,8 +18,8 @@ const loose = (await getNotes())
         <h2 class="section-label">系列</h2>
         <div class="card-grid">
           {series.map((s) => (
-            <a class="card" href={`/notes/${s.id}/`}>
-              <h3>{s.title}</h3>
+            <a class="card reveal" href={`/notes/${s.id}/`}>
+              <h3 style={vtStyle('series', s.id)}>{s.title}</h3>
               {s.description && <p>{s.description}</p>}
               <div class="meta num">
                 {s.notes.length} 篇{s.updated && ` · 更新于 ${fmtDate(s.updated)}`}
@@ -39,7 +39,7 @@ const loose = (await getNotes())
           {loose.map((n) => (
             <li>
               <time>{fmtDate(n.data.date)}</time>
-              <a href={`/notes/${n.id}/`}>
+              <a href={`/notes/${n.id}/`} style={vtStyle('note', n.id)}>
                 {titleOf(n)}
               </a>
               {n.data.description && <span class="desc">{n.data.description}</span>}

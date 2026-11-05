@@ -2,7 +2,7 @@
 import '../../styles/prose.css';
 import Base from '../../layouts/Base.astro';
 import { getCollection, type CollectionEntry } from 'astro:content';
-import { fmtDate } from '../../lib/content';
+import { fmtDate, vtStyle } from '../../lib/content';
 
 export async function getStaticPaths() {
   return (await getCollection('viz')).map((v) => ({ params: { slug: v.id }, props: { v } }));
@@ -13,7 +13,7 @@ const src = `/viz-raw/${v.data.file}`;
 
 <Base title={v.data.title} description={v.data.description} wide>
   <p class="kicker"><a href="/viz/">可视化</a></p>
-  <h1 class="page-title">{v.data.title}</h1>
+  <h1 class="page-title" style={vtStyle('viz', v.id)}>{v.data.title}</h1>
   {v.data.description && <p class="lede">{v.data.description}</p>}
   <iframe
     class="viz-frame"

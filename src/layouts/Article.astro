@@ -28,8 +28,10 @@ interface Props {
   minutes?: number;
   headings?: MarkdownHeading[];
   showToc?: boolean;
+  /** 标题的 view-transition-name，与列表页里同一篇的标题对应 */
+  vt?: string;
 }
-const { title, description, date, updated, tags = [], minutes, headings = [], showToc = true } = Astro.props;
+const { title, description, date, updated, tags = [], minutes, headings = [], showToc = true, vt } = Astro.props;
 const toc = headings.filter((h) => h.depth >= 2 && h.depth <= 3 && h.slug !== 'footnote-label');
 const hasToc = showToc && toc.length >= 3;
 ---
@@ -38,7 +40,7 @@ const hasToc = showToc && toc.length >= 3;
   <article class="article">
     <header class="article-header">
       <slot name="kicker" />
-      <h1>
+      <h1 style={vt ? `view-transition-name:${vt}` : undefined}>
         {title}
       </h1>
       {description && <p class="article-desc">{description}</p>}
@@ -114,7 +116,7 @@ const hasToc = showToc && toc.length >= 3;
     opacity: 0.6;
   }
 
-  /* 目录：宽屏固定在正文右侧，窄屏收在标题下方 */
+  /* 目录：宽屏固定在正文左侧（右侧留给旁注），窄屏收在标题下方 */
   .toc {
     font-size: 0.8125rem;
     line-height: 1.55;
@@ -154,7 +156,7 @@ const hasToc = showToc && toc.length >= 3;
     }
     .toc {
       position: absolute;
-      left: calc(100% + 5rem);
+      right: calc(100% + 5rem);
       top: 0;
       bottom: 0;
       width: 11.5rem;
@@ -172,6 +174,47 @@ const hasToc = showToc && toc.length >= 3;
 </style>
 
 <script>
+  // ---- 旁注：宽屏把每条脚注放到引用处右侧的页边，像书页边上的批注 ----
+  const prose = document.querySelector<HTMLElement>('.article .prose');
+  const refs = prose ? [...prose.querySelectorAll<HTMLAnchorElement>('sup a[data-footnote-ref]')] : [];
+  if (prose && refs.length) {
+    const notes = refs.flatMap((a) => {
+      const li = document.getElementById(decodeURIComponent(a.hash.slice(1)));
+      if (!li) return [];
+      const aside = document.createElement('aside');
+      aside.className = 'sidenote';
+      for (const c of li.children) aside.append(c.cloneNode(true));
+      const num = document.createElement('span');
+      num.className = 'sn-num';
+      num.textContent = a.textContent ?? '';
+      aside.firstElementChild?.prepend(num);
+      prose.append(aside);
+      return [[a, aside] as const];
+    });
+    prose.classList.add('has-sidenotes');
+    const wide = matchMedia('(min-width: 76rem)');
+    const place = () => {
+      if (!wide.matches) return;
+      const top0 = prose.getBoundingClientRect().top;
+      // 宽屏下可视化会伸进右侧页边，旁注要避开
+      const blocks = [...prose.querySelectorAll('figure.viz')].map((f) => {
+        const r = f.getBoundingClientRect();
+        return [r.top - top0, r.bottom - top0];
+      });
+      let floor = 0;
+      for (const [a, aside] of notes) {
+        let y = Math.max(a.getBoundingClientRect().top - top0 - 2, floor);
+        const h = aside.offsetHeight;
+        for (const [b0, b1] of blocks) if (y < b1 && y + h > b0) y = b1 + 12;
+        aside.style.top = `${y}px`;
+        floor = y + h + 14;
+      }
+    };
+    place();
+    wide.addEventListener('change', place);
+    new ResizeObserver(place).observe(prose);
+  }
+
   // 目录高亮当前阅读位置：最后一个已经滚过页面顶部的小标题
   const links = [...document.querySelectorAll<HTMLAnchorElement>('.toc a')];
   const heads = links

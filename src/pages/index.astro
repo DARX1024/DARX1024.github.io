@@ -4,17 +4,17 @@ import VizCard from '../components/VizCard.astro';
 import Globe from '../components/Globe.astro';
 import { getCollection } from 'astro:content';
 import { SITE } from '../site.config';
-import { getPosts, getNotes, getSeries, seriesIdOf, titleOf, fmtDate } from '../lib/content';
+import { getPosts, getNotes, getSeries, seriesIdOf, titleOf, fmtDate, vtStyle } from '../lib/content';
 
 // 动态：博客、笔记、可视化合在一起按时间倒序，做成时间线
 const [posts, notes, series, allViz] = await Promise.all([getPosts(), getNotes(), getSeries(), getCollection('viz')]);
 const seriesTitle = (id?: string) => series.find((s) => s.id === id)?.title;
 const RANK = { 博客: 0, 笔记: 1, 可视化: 2 } as const;
-type Item = { kind: keyof typeof RANK; href: string; title: string; desc?: string; date?: Date; where?: string };
+type Item = { kind: keyof typeof RANK; href: string; title: string; desc?: string; date?: Date; where?: string; vt: string };
 const news: Item[] = [
-  ...posts.map((p) => ({ kind: '博客' as const, href: `/blog/${p.id}/`, title: titleOf(p), desc: p.data.description, date: p.data.date })),
-  ...notes.map((n) => ({ kind: '笔记' as const, href: `/notes/${n.id}/`, title: titleOf(n), desc: n.data.description, date: n.data.date, where: seriesTitle(seriesIdOf(n)) })),
-  ...allViz.map((v) => ({ kind: '可视化' as const, href: `/viz/${v.id}/`, title: v.data.title, desc: v.data.description, date: v.data.date })),
+  ...posts.map((p) => ({ kind: '博客' as const, href: `/blog/${p.id}/`, title: titleOf(p), desc: p.data.description, date: p.data.date, vt: vtStyle('post', p.id) })),
+  ...notes.map((n) => ({ kind: '笔记' as const, href: `/notes/${n.id}/`, title: titleOf(n), desc: n.data.description, date: n.data.date, where: seriesTitle(seriesIdOf(n)), vt: vtStyle('note', n.id) })),
+  ...allViz.map((v) => ({ kind: '可视化' as const, href: `/viz/${v.id}/`, title: v.data.title, desc: v.data.description, date: v.data.date, vt: vtStyle('viz', v.id) })),
 ]
   .sort((a, b) => (b.date?.valueOf() ?? 0) - (a.date?.valueOf() ?? 0) || RANK[a.kind] - RANK[b.kind])
   .slice(0, 7);
@@ -42,11 +42,11 @@ const viz = [...allViz].sort((a, b) => (b.data.date?.valueOf() ?? 0) - (a.data.d
             {news.map((e, i) => {
               const sameDay = i > 0 && fmtDate(news[i - 1].date) === fmtDate(e.date);
               return (
-                <li class:list={[{ first: i === 0 }]}>
+                <li class:list={[{ first: i === 0 }]} style={`--i:${i}`}>
                   <time class="tl-date" datetime={e.date?.toISOString()}>{sameDay ? '' : fmtDate(e.date)}</time>
                   <div class="tl-body">
                     <span class="tl-kind">{e.kind}{e.where && ` · ${e.where}`}</span>
-                    <a class="tl-title" href={e.href}>{e.title}</a>
+                    <a class="tl-title" href={e.href} style={e.vt}>{e.title}</a>
                     {i === 0 && e.desc && <p class="tl-desc">{e.desc}</p>}
                   </div>
                 </li>
@@ -81,8 +81,8 @@ const viz = [...allViz].sort((a, b) => (b.data.date?.valueOf() ?? 0) - (a.data.d
         </h2>
         <div class="card-grid">
           {series.map((s) => (
-            <a class="card" href={`/notes/${s.id}/`}>
-              <h3>{s.title}</h3>
+            <a class="card reveal" href={`/notes/${s.id}/`}>
+              <h3 style={vtStyle('series', s.id)}>{s.title}</h3>
               {s.description && <p>{s.description}</p>}
               <div class="meta num">
                 {s.notes.length} 篇{s.updated && ` · 更新于 ${fmtDate(s.updated)}`}
@@ -168,16 +168,29 @@ const viz = [...allViz].sort((a, b) => (b.data.date?.valueOf() ?? 0) - (a.data.d
     display: grid;
     gap: 0.2rem;
     padding: 0 0 1.6rem 1.5rem;
-    border-left: 1px solid var(--border);
+  }
+  /* 竖线拆成每条之间的一段，进场时依次「画」下来 */
+  .tl-body::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.42rem;
+    bottom: -0.42rem;
+    width: 1px;
+    background: var(--border);
+    transform-origin: 50% 0;
   }
   .timeline li:last-child .tl-body {
-    border-left-color: transparent;
     padding-bottom: 0;
+  }
+  .timeline li:last-child .tl-body::after {
+    display: none;
   }
   .tl-body::before {
     content: '';
     position: absolute;
-    left: -4px;
+    z-index: 1;
+    left: -3px;
     top: 0.42rem;
     width: 7px;
     height: 7px;
@@ -218,6 +231,37 @@ const viz = [...allViz].sort((a, b) => (b.data.date?.valueOf() ?? 0) - (a.data.d
     font-size: 0.9375rem;
     line-height: 1.75;
     color: var(--fg-soft);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .timeline li {
+      --t: calc(var(--i, 0) * 140ms + 120ms);
+    }
+    .tl-body::before {
+      animation: tl-dot 0.35s cubic-bezier(0.3, 1.4, 0.5, 1) var(--t) both;
+    }
+    .tl-body::after {
+      animation: tl-draw 0.5s cubic-bezier(0.4, 0, 0.2, 1) calc(var(--t) + 120ms) both;
+    }
+    .tl-date,
+    .tl-body > * {
+      animation: tl-in 0.5s ease calc(var(--t) + 40ms) both;
+    }
+  }
+  @keyframes tl-dot {
+    from {
+      transform: scale(0);
+    }
+  }
+  @keyframes tl-draw {
+    from {
+      transform: scaleY(0);
+    }
+  }
+  @keyframes tl-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
   }
   @media (max-width: 34rem) {
     .timeline li {

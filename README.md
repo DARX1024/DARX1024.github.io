@@ -121,7 +121,9 @@ URL 规则：`blog/xxx.md → /blog/xxx/`，`notes/signals-and-systems/02 卷积
 
 ### 缩略图
 
-首页和图库的卡片用 `viz-raw/_thumbs/<名字>.jpg`，没有就显示文字封面。生成方法：
+首页和图库的卡片用 `viz-raw/_thumbs/<名字>-light.png` 和 `<名字>-dark.png`（透明底线稿，跟随主题切换），没有就显示文字封面。
+截图时会把可视化里的 `--vec` `--re` `--env` `--im` 这几个数据色收成站点的前景色 + 强调色，和首页地球仪保持同一种线稿风格；
+自己的可视化如果用了别的颜色变量名，在 `scripts/viz-thumbs.mjs` 的 `inkOf` 里加上即可。生成方法：
 
 ```bash
 npm i -D playwright && npx playwright install chromium   # 只需一次

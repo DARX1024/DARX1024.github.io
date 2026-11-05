@@ -7,6 +7,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkObsidian from './src/plugins/remark-obsidian.mjs';
 import remarkCallout from './src/plugins/remark-callout.mjs';
 import rehypeHeadingMath from './src/plugins/rehype-heading-math.mjs';
+import rehypeHeadingNumber from './src/plugins/rehype-heading-number.mjs';
 import { vizIntegration } from './src/plugins/viz.mjs';
 
 export default defineConfig({
@@ -20,7 +21,7 @@ export default defineConfig({
     // .md 和 .mdx 共用这一套。
     processor: unified({
       remarkPlugins: [remarkMath, remarkCallout, remarkObsidian],
-      rehypePlugins: [[rehypeKatex, { strict: false, throwOnError: false }], rehypeHeadingMath],
+      rehypePlugins: [[rehypeKatex, { strict: false, throwOnError: false }], rehypeHeadingMath, rehypeHeadingNumber],
       remarkRehype: { footnoteLabel: '脚注', footnoteBackLabel: '回到正文' },
     }),
     shikiConfig: {

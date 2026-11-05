@@ -62,3 +62,8 @@ export function readingMinutes(body = '') {
 export const fmtDate = (d?: Date) => (d ? d.toISOString().slice(0, 10) : '');
 export const fmtDateLong = (d?: Date) =>
   d ? `${d.getUTCFullYear()} 年 ${d.getUTCMonth() + 1} 月 ${d.getUTCDate()} 日` : '';
+
+/** 页面切换时让同一篇内容的标题从列表「飞」到详情页：两边用同一个 view-transition-name */
+export const vtName = (kind: 'post' | 'note' | 'series' | 'viz', id: string) =>
+  `vt-${kind}-${id.replace(/[^\p{L}\p{N}_-]+/gu, '-')}`;
+export const vtStyle = (kind: Parameters<typeof vtName>[0], id: string) => `view-transition-name:${vtName(kind, id)}`;

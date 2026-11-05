@@ -34,6 +34,13 @@ function meta(html, name) {
   return content ? decode(content.trim()) : undefined;
 }
 
+function thumbsOf(id) {
+  const has = (f) => fs.existsSync(path.join(VIZ_SRC, '_thumbs', f));
+  if (has(`${id}-dark.png`) && has(`${id}-light.png`)) return { thumb: `_thumbs/${id}-dark.png`, thumbLight: `_thumbs/${id}-light.png` };
+  if (has(`${id}.jpg`)) return { thumb: `_thumbs/${id}.jpg` };
+  return {};
+}
+
 export function readVizMeta({ id, file }) {
   const abs = path.join(VIZ_SRC, file);
   const html = fs.readFileSync(abs, 'utf8');
@@ -46,8 +53,8 @@ export function readVizMeta({ id, file }) {
       date: meta(html, 'viz:date') ?? fs.statSync(abs).mtime.toISOString().slice(0, 10),
       tags: meta(html, 'viz:tags')?.split(/[,，]\s*/).filter(Boolean) ?? [],
       height: Number(meta(html, 'viz:height')) || undefined,
-      // npm run thumbs 生成的缩略图
-      thumb: fs.existsSync(path.join(VIZ_SRC, '_thumbs', `${id}.jpg`)) ? `_thumbs/${id}.jpg` : undefined,
+      // npm run thumbs 生成的缩略图：亮/暗各一张透明底线稿
+      ...thumbsOf(id),
       file,
     },
   };

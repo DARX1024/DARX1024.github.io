@@ -1,27 +1,35 @@
 ---
 // 可视化卡片：有缩略图（npm run thumbs 生成）就显示图，没有就显示标题排版的封面
 import type { CollectionEntry } from 'astro:content';
-import { fmtDate } from '../lib/content';
+import { fmtDate, vtStyle } from '../lib/content';
 
 interface Props {
   v: CollectionEntry<'viz'>;
   meta?: boolean;
+  /** 标题参与页面切换动画（同一页里同一个可视化只能有一处开启） */
+  vt?: boolean;
 }
-const { v, meta = false } = Astro.props;
+const { v, meta = false, vt = false } = Astro.props;
+const { thumb, thumbLight } = v.data;
 ---
 
-<a class="viz-card" href={`/viz/${v.id}/`}>
+<a class="viz-card reveal" href={`/viz/${v.id}/`}>
   <span class="viz-preview">
     {
-      v.data.thumb ? (
-        <img src={`/viz-raw/${v.data.thumb}`} alt="" loading="lazy" decoding="async" />
+      thumb && thumbLight ? (
+        <>
+          <img class="t-dark" src={`/viz-raw/${thumb}`} alt="" loading="lazy" decoding="async" />
+          <img class="t-light" src={`/viz-raw/${thumbLight}`} alt="" loading="lazy" decoding="async" />
+        </>
+      ) : thumb ? (
+        <img src={`/viz-raw/${thumb}`} alt="" loading="lazy" decoding="async" />
       ) : (
         <span class="viz-cover" aria-hidden="true">{v.data.title}</span>
       )
     }
   </span>
   <span class="viz-card-body">
-    <span class="viz-card-title">{v.data.title}</span>
+    <span class="viz-card-title" style={vt ? vtStyle('viz', v.id) : undefined}>{v.data.title}</span>
     {v.data.description && <span class="viz-card-desc">{v.data.description}</span>}
     {
       meta && (
@@ -54,7 +62,15 @@ const { v, meta = false } = Astro.props;
     aspect-ratio: 16 / 9;
     overflow: hidden;
     border-bottom: 1px solid var(--border);
-    background: #171513;
+    background: var(--bg);
+  }
+  /* 亮/暗两张透明底线稿，跟随主题显示其中一张 */
+  .viz-preview .t-light,
+  :global(:root[data-theme='light']) .viz-preview .t-dark {
+    display: none;
+  }
+  :global(:root[data-theme='light']) .viz-preview .t-light {
+    display: block;
   }
   .viz-preview img {
     width: 100%;

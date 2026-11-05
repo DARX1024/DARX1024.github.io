@@ -13,12 +13,15 @@
     'PingFang SC', 'Microsoft YaHei', monospace;
 
   --font-body: var(--font-sans); /* 想要衬线正文就改成 var(--font-serif) */
-  /* 标题：西文用衬线，中文仍回落到黑体（Windows 没有好看的中文衬线，宋体加粗很难看） */
-  --font-heading: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Source Serif 4', Georgia, 'PingFang SC',
+  /* 标题：西文用 Newsreader（只加载拉丁字符、单一字重，约 24KB），中文仍回落到黑体
+     （Windows 没有好看的中文衬线，宋体加粗很难看） */
+  --font-heading: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Source Serif 4', Georgia, 'PingFang SC',
     'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', serif;
 
   --measure: 40rem; /* 正文行宽：约 38 个汉字 / 75 个英文字符 */
   --wide: 56rem;
+  /* 线稿小行星（分节符等处用作 mask，颜色跟随 currentColor/背景色） */
+  --orbit-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 52 18' fill='none' stroke='%23000' stroke-linecap='round'%3E%3Cg transform='rotate(-12 26 9)'%3E%3Ccircle cx='26' cy='9' r='4.6' stroke-width='1.2'/%3E%3Cpath d='M10 9a16 3.8 0 0 0 32 0' stroke-width='1.1'/%3E%3Cpath d='M10 9a16 3.8 0 0 1 13.33-3.75M28.67 5.25A16 3.8 0 0 1 42 9' stroke-width='1.1'/%3E%3C/g%3E%3Ccircle cx='3' cy='10' r='.9' fill='%23000' stroke='none'/%3E%3Ccircle cx='49' cy='7' r='.9' fill='%23000' stroke='none'/%3E%3C/svg%3E");
   --gutter: clamp(1rem, 5vw, 2rem);
 
   --bg: #fcfcfa;
@@ -31,6 +34,8 @@
   --accent-soft: rgba(47, 93, 138, 0.1);
   --mark: rgba(255, 214, 102, 0.45);
   --selection: rgba(47, 93, 138, 0.18);
+  --header-bg: rgba(252, 252, 250, 0.78);
+  --grain: none;
 
   color-scheme: light;
 }
@@ -47,6 +52,9 @@
   --accent-soft: rgba(217, 165, 91, 0.12);
   --mark: rgba(217, 165, 91, 0.25);
   --selection: rgba(217, 165, 91, 0.25);
+  --header-bg: rgba(23, 21, 19, 0.78);
+  /* 极淡的纸张颗粒，让暗底不那么「平」 */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .88 0 0 0 0 .78 0 0 0 -1.6 1.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
 
   color-scheme: dark;
 }
@@ -68,7 +76,13 @@ html {
 
 body {
   margin: 0;
-  background: var(--bg);
+  /* 内容不足一屏时，页脚仍贴在底部 */
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg);
+  background-image: var(--grain);
   color: var(--fg);
   font-family: var(--font-body);
   font-size: 1.0625rem; /* 17px */
@@ -159,6 +173,15 @@ img {
   background: var(--bg);
   border-bottom: 1px solid transparent;
   transition: border-color 0.2s;
+  view-transition-name: site-header;
+}
+/* 毛玻璃页头：滚动时正文从下面隐约透过 */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .site-header {
+    background: var(--grain), var(--header-bg);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    backdrop-filter: saturate(1.4) blur(14px);
+  }
 }
 .site-header.scrolled {
   border-bottom-color: var(--border);
@@ -253,6 +276,7 @@ img {
 }
 
 main {
+  flex: 1 0 auto;
   padding-block: 3rem 6rem;
 }
 
@@ -468,4 +492,77 @@ h4,
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
   gap: 1.25rem;
+}
+
+/* ===========================================================
+   页面切换（跨文档 View Transitions）
+   不支持的浏览器直接普通跳转；系统开了「减少动态效果」则不做动画。
+   =========================================================== */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+::view-transition-group(*) {
+  animation-duration: 0.38s;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+/* 整页：旧页淡出，新页从略低处淡入 */
+::view-transition-old(root) {
+  animation: 0.18s ease-in both vt-fade-out;
+}
+::view-transition-new(root) {
+  animation: 0.38s cubic-bezier(0.2, 0.7, 0.2, 1) 0.06s both vt-rise-in;
+}
+/* 列表里的标题飞到文章页标题的位置：文字快照按高度等比缩放，不拉伸变形 */
+::view-transition-old(*),
+::view-transition-new(*) {
+  height: 100%;
+  width: auto;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  width: 100%;
+  height: auto;
+}
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* 主题切换：新主题从按钮处圆形扩散开（见 Base.astro）。期间不让其他元素单独过渡 */
+:root.theme-vt * {
+  view-transition-name: none !important;
+}
+:root.theme-vt::view-transition-old(root),
+:root.theme-vt::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* ===========================================================
+   滚动淡入：元素进入视口时轻轻浮现。纯 CSS（scroll-driven animations），
+   不支持的浏览器直接显示，不影响阅读。
+   =========================================================== */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 70%;
+    }
+  }
+}
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
 }

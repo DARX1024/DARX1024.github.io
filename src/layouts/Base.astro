@@ -1,4 +1,6 @@
 ---
+// 标题西文字体：只加载拉丁字符的 600 字重（约 24KB），中文仍用系统字体
+import '@fontsource/newsreader/latin-600.css';
 import '../styles/global.css';
 import { SITE, NAV } from '../site.config';
 import { getPosts } from '../lib/content';
@@ -96,12 +98,34 @@ const nav = NAV.filter((n) => n.href !== '/blog/' || hasPosts);
       addEventListener('scroll', onScroll, { passive: true });
       onScroll();
 
-      // ---- 主题切换 ----
-      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+      // ---- 主题切换：新主题从按钮处圆形扩散开（不支持 View Transitions 或减少动态效果时直接切换） ----
+      const toggle = document.querySelector<HTMLButtonElement>('.theme-toggle');
+      toggle?.addEventListener('click', () => {
         const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-        root.dataset.theme = next;
-        try { localStorage.setItem('theme', next); } catch {}
-        document.querySelectorAll<HTMLIFrameElement>('iframe.viz-frame').forEach(syncTheme);
+        const apply = () => {
+          root.dataset.theme = next;
+          try { localStorage.setItem('theme', next); } catch {}
+          document.querySelectorAll<HTMLIFrameElement>('iframe.viz-frame').forEach(syncTheme);
+        };
+        if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          apply();
+          return;
+        }
+        const r = toggle.getBoundingClientRect();
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+        root.classList.add('theme-vt');
+        const t = document.startViewTransition(apply);
+        t.ready
+          .then(() => {
+            root.animate(
+              { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+              { duration: 560, easing: 'cubic-bezier(0.3, 0.6, 0.2, 1)', pseudoElement: '::view-transition-new(root)' },
+            );
+          })
+          .catch(() => {});
+        t.finished.finally(() => root.classList.remove('theme-vt'));
       });
 
       // ---- 可视化 iframe：同步主题 + 自动高度 ----
