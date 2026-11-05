@@ -979,10 +979,10 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
   });
 
   // 从生活页或分享链接进来：/games/#艾尔登法环 直接打开那一款
-  const fromHash = decodeURIComponent(location.hash.slice(1));
-  if (fromHash && data[fromHash]) {
-    const card = document.querySelector<HTMLElement>(`a.game[data-game="${CSS.escape(fromHash)}"]`);
-    card?.scrollIntoView({ block: 'center' });
-    open(fromHash, null);
-  }
+  const openFromHash = () => {
+    const slug = decodeURIComponent(location.hash.slice(1));
+    if (slug && data[slug]) open(slug, null);
+  };
+  openFromHash();
+  addEventListener('hashchange', openFromHash);
 </script>
