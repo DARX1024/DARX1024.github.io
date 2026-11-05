@@ -1,0 +1,71 @@
+---
+// 首页底部的线稿地球仪。纯 Canvas，无框架依赖；场景逻辑见 src/lib/globe-scene.ts
+---
+
+<section class="globe-block" aria-label="地球仪">
+  <div class="globe" data-globe>
+    <canvas aria-hidden="true"></canvas>
+    <div class="globe-handle" tabindex="0" role="img" aria-label="线稿地球仪，可拖动旋转，也可用方向键转动"></div>
+  </div>
+  <p class="globe-hint">拖动地球仪，松手它会继续转一会儿</p>
+</section>
+
+<script>
+  import { mountGlobe } from '../lib/globe-scene';
+  document.querySelectorAll<HTMLElement>('[data-globe]').forEach((el) => {
+    try { mountGlobe(el); } catch (e) { console.error(e); }
+  });
+</script>
+
+<style>
+  .globe-block {
+    margin-top: 5rem;
+  }
+  .globe {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    max-height: 600px;
+    width: 100%;
+    margin-inline: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    cursor: grab;
+  }
+  .globe.dragging {
+    cursor: grabbing;
+  }
+  .globe canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* 页面其余区域保留上下滚动，横向拖动仍可旋转 */
+    touch-action: pan-y;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+  .globe.ready canvas {
+    opacity: 1;
+  }
+  .globe-handle {
+    position: absolute;
+    border-radius: 50%;
+    /* 球体上任意方向拖动都旋转，不触发页面滚动 */
+    touch-action: none;
+  }
+  .globe-handle:focus-visible {
+    outline: 1px dashed var(--accent);
+    outline-offset: 4px;
+  }
+  .globe-hint {
+    margin: 0.5rem 0 0;
+    text-align: center;
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+  @media (max-width: 40rem) {
+    .globe {
+      aspect-ratio: 1 / 1.15;
+    }
+  }
+</style>
