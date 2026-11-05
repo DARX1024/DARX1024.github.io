@@ -30,11 +30,14 @@ src/content/
   notes/                笔记
     signals-and-systems/  一个文件夹 = 一个系列
   attachments/          图片附件
+  life/                 生活区的随笔，一个 .md 一篇（/life/）
+  games/                游戏墙，一个 .md 一款游戏（/games/）
   pages/about.md        关于页
   series.yaml           系列的标题、简介、课程链接
 viz-raw/                独立的交互可视化 HTML
   _thumbs/              npm run thumbs 生成的缩略图（要一起提交）
-src/site.config.ts      站点名、简介、导航、GitHub 链接
+src/data/steam.json     Steam 同步下来的时长、成就、封面（自动生成，不用手改）
+src/site.config.ts      站点名、简介、导航、GitHub 链接、Steam 主页
 src/styles/             全局样式（global.css）和正文排版（prose.css）
 src/plugins/            Obsidian 语法、可视化处理的插件
 ```
@@ -158,6 +161,36 @@ new MutationObserver(redraw).observe(document.documentElement, {
 ```
 
 iframe 高度会根据内容自动调整，不需要做什么。以上都是可选的，不写也能正常嵌入。
+
+## 生活区和游戏墙
+
+导航里的「生活」（`/life/`）放学术以外的东西：随笔 + 游戏。两边都没有内容时导航里不显示。
+
+**随笔**：放进 `src/content/life/`，写法和博客完全一样（frontmatter、Obsidian 语法都通用）。
+
+**游戏**：`src/content/games/` 里一个 `.md` 就是墙上的一款游戏，复制 `_模板.md` 改就行。
+
+- frontmatter 是你自己的记录：`status`（在玩 / 通关 / 搁置 / 弃坑 / 想玩）、`rating`（10 分制）、`finished`（通关日期）、`description`（一句话短评）等
+- 写了正文就有评测页 `/games/<文件名>/`；只写 frontmatter 就只上墙，点封面跳 Steam 商店
+- Steam 游戏填 `steam: <appid>`（或者直接贴商店链接），时长、成就、封面自动同步
+- 非 Steam 游戏不填 `steam`，用 `platform`、`hours`、`cover` 手动写；`cover` 可以是图片链接，也可以是 attachments/ 里的文件名
+- Steam 库里玩过 3 小时以上的游戏即使没建档也会自动上墙（只有封面和时长）。阈值在 `site.config.ts` 的 `GAMES.libraryMinHours` 改，设为 `false` 关掉。想藏某一款：给它建档并写 `publish: false`
+- 墙上的状态和评分以你写的为准。Steam 没有「通关」这个数据，所以通关要手动标；最近两周玩过且没标状态的会自动显示为「在玩」
+
+### Steam 同步
+
+`.github/workflows/steam-sync.yml` 每天跑一次 `scripts/steam-sync.mjs`，把结果写进 `src/data/steam.json`，有变化就提交并重新部署。第一次需要：
+
+1. 在 https://steamcommunity.com/dev/apikey 申请 Web API Key（域名随便填，比如 `darx1024.github.io`）
+2. Steam 个人资料 → 编辑个人资料 → 隐私设置：「我的个人资料」和「游戏详情」设为**公开**
+3. GitHub 仓库 Settings → Secrets and variables → Actions → New repository secret，名字 `STEAM_API_KEY`，值是上面的 Key
+4. Actions 页面选「Sync Steam data」→ Run workflow 手动跑第一次
+
+Key 只存在 GitHub Secrets 里，不会出现在网页或仓库中。没有 Key 时同步照样能跑（只更新建档游戏的封面和名字），网站构建也不受影响。本地想手动同步：
+
+```bash
+STEAM_API_KEY=你的key node scripts/steam-sync.mjs
+```
 
 ## 排版说明
 

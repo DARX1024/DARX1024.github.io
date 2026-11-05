@@ -2,6 +2,7 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 
 export type Post = CollectionEntry<'blog'>;
 export type Note = CollectionEntry<'notes'>;
+export type Essay = CollectionEntry<'life'>;
 
 /** 网站只做展示：除非写了 publish: false，否则都显示 */
 export const isVisible = (e: { data: { publish: boolean } }) => e.data.publish;
@@ -14,6 +15,10 @@ const byDateDesc = (a: { data: { date?: Date } }, b: { data: { date?: Date } }) 
 
 export async function getPosts() {
   return (await getCollection('blog', isVisible)).sort(byDateDesc);
+}
+
+export async function getEssays() {
+  return (await getCollection('life', isVisible)).sort(byDateDesc);
 }
 
 /** 笔记的系列 = notes/ 下第一层文件夹；直接放在 notes/ 根下的是独立笔记 */
@@ -64,6 +69,6 @@ export const fmtDateLong = (d?: Date) =>
   d ? `${d.getUTCFullYear()} 年 ${d.getUTCMonth() + 1} 月 ${d.getUTCDate()} 日` : '';
 
 /** 页面切换时让同一篇内容的标题从列表「飞」到详情页：两边用同一个 view-transition-name */
-export const vtName = (kind: 'post' | 'note' | 'series' | 'viz', id: string) =>
+export const vtName = (kind: 'post' | 'note' | 'series' | 'viz' | 'life' | 'game', id: string) =>
   `vt-${kind}-${id.replace(/[^\p{L}\p{N}_-]+/gu, '-')}`;
 export const vtStyle = (kind: Parameters<typeof vtName>[0], id: string) => `view-transition-name:${vtName(kind, id)}`;

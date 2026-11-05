@@ -64,9 +64,49 @@ const viz = defineCollection({
   }),
 });
 
+// 生活区的随笔：和博客一样，一个 .md 一篇
+const life = defineCollection({
+  loader: glob({ base: './src/content/life', pattern, generateId }),
+  schema: z.object(base),
+});
+
+// 游戏：一个 .md = 游戏墙上的一款游戏。frontmatter 是你自己的记录，正文写了就是评测（不写只上墙）。
+// Steam 上的时长、成就、封面由 scripts/steam-sync.mjs 拉取，见 lib/games.ts。
+const STATUS: Record<string, 'playing' | 'finished' | 'shelved' | 'dropped' | 'wishlist'> = {
+  在玩: 'playing', playing: 'playing',
+  通关: 'finished', 已通关: 'finished', finished: 'finished', completed: 'finished', beaten: 'finished',
+  搁置: 'shelved', shelved: 'shelved', paused: 'shelved',
+  弃坑: 'dropped', dropped: 'dropped', abandoned: 'dropped',
+  想玩: 'wishlist', wishlist: 'wishlist', backlog: 'wishlist',
+};
+const games = defineCollection({
+  loader: glob({ base: './src/content/games', pattern, generateId }),
+  schema: z.object({
+    ...base,
+    // Steam appid，也可以直接粘贴商店链接 https://store.steampowered.com/app/1245620/...
+    steam: z
+      .union([z.number(), z.string()])
+      .optional()
+      .transform((v) => {
+        const m = v == null ? null : String(v).match(/(?:\/app\/)?(\d+)/);
+        return m ? Number(m[1]) : undefined;
+      }),
+    platform: z.string().optional(), // 非 Steam 游戏写 Switch / PS5 / iOS 等
+    status: z
+      .string()
+      .optional()
+      .transform((v) => (v ? STATUS[v.trim().toLowerCase()] ?? STATUS[v.trim()] : undefined)),
+    rating: z.coerce.number().min(0).max(10).optional(), // 10 分制
+    started: z.coerce.date().optional(),
+    finished: z.coerce.date().optional(), // 通关日期
+    hours: z.coerce.number().optional(), // 手动填写的时长；Steam 游戏不用填
+    cover: z.string().optional(), // 封面：图片链接，或 attachments/ 里的文件名（也可以写 [[封面.jpg]]）
+  }),
+});
+
 const pages = defineCollection({
   loader: glob({ base: './src/content/pages', pattern: '*.{md,mdx}' }),
   schema: z.object({ title: z.string(), description: z.string().optional() }),
 });
 
-export const collections = { blog, notes, series, viz, pages };
+export const collections = { blog, notes, series, viz, life, games, pages };

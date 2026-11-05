@@ -1,0 +1,59 @@
+---
+import { render } from 'astro:content';
+import Article from '../../layouts/Article.astro';
+import Viz from '../../components/Viz.astro';
+import { getEssays, titleOf, readingMinutes, vtName, type Essay } from '../../lib/content';
+
+export async function getStaticPaths() {
+  const essays = await getEssays();
+  return essays.map((essay, i) => ({
+    params: { slug: essay.id },
+    props: { essay, newer: essays[i - 1], older: essays[i + 1] },
+  }));
+}
+
+interface Props {
+  essay: Essay;
+  newer?: Essay;
+  older?: Essay;
+}
+const { essay, newer, older } = Astro.props;
+const { Content, headings } = await render(essay);
+---
+
+<Article
+  title={titleOf(essay)}
+  description={essay.data.description}
+  date={essay.data.date}
+  updated={essay.data.updated}
+  tags={essay.data.tags}
+  minutes={readingMinutes(essay.body)}
+  headings={headings}
+  showToc={essay.data.toc}
+  vt={vtName('life', essay.id)}
+>
+  <p slot="kicker" class="kicker"><a href="/life/">随笔</a></p>
+  <Content components={{ Viz }} />
+  {
+    (older || newer) && (
+      <nav slot="after" class="pager">
+        {older ? <a href={`/life/${older.id}/`}><span>← 更早</span>{titleOf(older)}</a> : <span />}
+        {newer && <a class="next" href={`/life/${newer.id}/`}><span>更新 →</span>{titleOf(newer)}</a>}
+      </nav>
+    )
+  }
+</Article>
+
+<style>
+  .kicker {
+    margin: 0 0 0.6rem;
+    font-size: 0.875rem;
+  }
+  .kicker a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .kicker a:hover {
+    color: var(--accent);
+  }
+</style>

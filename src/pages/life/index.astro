@@ -1,0 +1,138 @@
+---
+import Base from '../../layouts/Base.astro';
+import GameCard from '../../components/GameCard.astro';
+import { getEssays, titleOf, fmtDate, vtStyle } from '../../lib/content';
+import { getGames, getReviews } from '../../lib/games';
+
+const [essays, games, reviews] = await Promise.all([getEssays(), getGames(), getReviews()]);
+const byYear = Map.groupBy(essays, (p) => p.data.date?.getUTCFullYear() ?? '未注明日期');
+// 墙上最近的几款（想玩的不算）
+const shelf = games.filter((g) => g.status !== 'wishlist').slice(0, 6);
+---
+
+<Base title="生活" description="学术以外：随笔、游戏和评测" wide>
+  <h1 class="page-title">生活</h1>
+  <p class="page-lede">学术以外的东西：随手写的文字，和玩过的游戏。</p>
+
+  {
+    shelf.length > 0 && (
+      <section class="block">
+        <h2 class="block-label">
+          <span>最近玩过</span>
+          <a href="/games/">游戏墙 →</a>
+        </h2>
+        <div class="shelf">
+          {shelf.map((g) => <GameCard g={g} eager />)}
+        </div>
+      </section>
+    )
+  }
+
+  <div class="cols">
+    {
+      essays.length > 0 && (
+        <section class="block">
+          <h2 class="block-label"><span>随笔</span></h2>
+          {[...byYear].map(([year, list]) => (
+            <>
+              <h3 class="year">{year}</h3>
+              <ul class="entry-list">
+                {list.map((p) => (
+                  <li>
+                    <time datetime={p.data.date?.toISOString()}>{fmtDate(p.data.date).slice(5)}</time>
+                    <a href={`/life/${p.id}/`} style={vtStyle('life', p.id)}>{titleOf(p)}</a>
+                    {p.data.description && <span class="desc">{p.data.description}</span>}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ))}
+        </section>
+      )
+    }
+
+    {
+      reviews.length > 0 && (
+        <section class="block">
+          <h2 class="block-label"><span>游戏评测</span></h2>
+          <ul class="entry-list">
+            {reviews.map((g) => (
+              <li>
+                <time datetime={g.entry!.data.date?.toISOString()}>{fmtDate(g.entry!.data.date)}</time>
+                <a href={g.href} style={vtStyle('game', g.entry!.id)}>
+                  {g.title}
+                  {g.rating != null && <span class="score num">{g.rating.toFixed(1)}</span>}
+                </a>
+                {g.description && <span class="desc">{g.description}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+  </div>
+
+  {essays.length === 0 && games.length === 0 && <p class="muted">还没有内容。</p>}
+</Base>
+
+<style>
+  .page-lede {
+    margin-bottom: 1rem;
+  }
+  .block {
+    margin-top: 3rem;
+  }
+  .block-label {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin: 0 0 1.5rem;
+  }
+  .block-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    order: 1;
+  }
+  .block-label a {
+    order: 2;
+    letter-spacing: 0;
+    text-decoration: none;
+    font-weight: 400;
+  }
+  .shelf {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+  @media (max-width: 44rem) {
+    .shelf {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1.25rem 0.9rem;
+    }
+  }
+  .cols {
+    display: grid;
+    gap: 0 4rem;
+  }
+  @media (min-width: 56rem) {
+    .cols:has(> section + section) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  .cols .year:first-of-type {
+    margin-top: 0;
+  }
+  .score {
+    margin-left: 0.6em;
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    color: var(--accent);
+  }
+</style>

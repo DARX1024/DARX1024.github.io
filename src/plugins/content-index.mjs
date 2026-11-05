@@ -8,7 +8,7 @@ import { entryId } from './slug.mjs';
 export const CONTENT_DIR = path.resolve('src/content');
 
 /** 哪些文件夹会发布成页面，以及对应的 URL 前缀。 */
-export const COLLECTIONS = { blog: '/blog/', notes: '/notes/' };
+export const COLLECTIONS = { blog: '/blog/', notes: '/notes/', life: '/life/', games: '/games/' };
 
 export const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
 const IGNORED_DIR = /^(\.|_|node_modules$)/;
@@ -35,6 +35,8 @@ export function readFrontmatter(file) {
   }
 }
 
+const hasBody = (file) => fs.readFileSync(file, 'utf8').replace(/^---\r?\n[\s\S]*?\r?\n---/, '').trim().length > 0;
+
 /** 和 content.config.ts 一致：默认发布，publish: false 隐藏 */
 export const isPublished = (data) => data.publish !== false;
 
@@ -59,6 +61,8 @@ export function getIndex() {
     if (!COLLECTIONS[collection] || rest.length === 0) continue;
     const data = readFrontmatter(file);
     if (!isPublished(data)) continue;
+    // 没写正文的游戏只上墙、没有单独页面，不能被 [[链接]] 到
+    if (collection === 'games' && !hasBody(file)) continue;
 
     const stem = base.replace(/\.(md|mdx)$/i, '');
     const target = {
