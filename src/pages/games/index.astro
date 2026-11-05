@@ -1,0 +1,198 @@
+---
+import Base from '../../layouts/Base.astro';
+import GameCard from '../../components/GameCard.astro';
+import { getGames, steamUpdatedAt, STATUS_LABEL, type Status } from '../../lib/games';
+import { fmtDate } from '../../lib/content';
+
+const games = await getGames();
+const count = (s: Status) => games.filter((g) => g.status === s).length;
+const filters = [
+  { key: 'all', label: '全部', n: games.length },
+  ...(Object.keys(STATUS_LABEL) as Status[]).map((s) => ({ key: s, label: STATUS_LABEL[s], n: count(s) })),
+  { key: 'review', label: '有评测', n: games.filter((g) => g.href && !g.external).length },
+].filter((f) => f.key === 'all' || f.n > 0);
+const totalHours = Math.round(games.reduce((t, g) => t + (g.hours ?? 0), 0));
+---
+
+<Base title="游戏墙" description="玩过、在玩和想玩的游戏" wide>
+  <p class="crumb"><a href="/life/">生活</a></p>
+  <h1 class="page-title">游戏墙</h1>
+  <p class="page-lede">
+    {games.length} 款{count('finished') > 0 && ` · 通关 ${count('finished')}`}{totalHours > 0 && ` · 共 ${totalHours.toLocaleString('en-US')} 小时`}
+    {steamUpdatedAt && <span class="muted"> · Steam 数据同步于 {fmtDate(steamUpdatedAt)}</span>}
+  </p>
+
+  {
+    games.length > 0 ? (
+      <>
+        <div class="toolbar">
+          <div class="filters" role="group" aria-label="按状态筛选">
+            {filters.map((f, i) => (
+              <button type="button" data-filter={f.key} aria-pressed={i === 0 ? 'true' : 'false'}>
+                {f.label}
+                <span class="num">{f.n}</span>
+              </button>
+            ))}
+          </div>
+          <label class="sort">
+            <span class="sr-only">排序</span>
+            <select>
+              <option value="activity">最近</option>
+              <option value="hours">时长</option>
+              <option value="rating">评分</option>
+            </select>
+          </label>
+        </div>
+        <ul class="wall">
+          {games.map((g, i) => (
+            <li
+              data-status={g.status ?? ''}
+              data-review={g.href && !g.external ? '' : undefined}
+              data-activity={g.activity?.valueOf() ?? 0}
+              data-hours={g.hours ?? 0}
+              data-rating={g.rating ?? -1}
+              data-i={i}
+            >
+              <GameCard g={g} eager={i < 10} vt />
+            </li>
+          ))}
+        </ul>
+        <p class="empty muted" hidden>这一类还没有游戏。</p>
+      </>
+    ) : (
+      <p class="muted">还没有游戏。在 src/content/games/ 里建档，或者配置 Steam 同步（见 README）。</p>
+    )
+  }
+</Base>
+
+<style>
+  .crumb {
+    margin: 0 0 0.4rem;
+    font-size: 0.875rem;
+  }
+  .crumb a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .crumb a::after {
+    content: ' /';
+    opacity: 0.6;
+  }
+  .page-lede {
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 2rem;
+  }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.5rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.2rem;
+    margin-right: auto;
+  }
+  .filters button,
+  .sort select {
+    appearance: none;
+    font: inherit;
+    font-size: 0.9375rem;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    padding: 0.2rem 0;
+    cursor: pointer;
+  }
+  .filters button {
+    position: relative;
+  }
+  .filters button .num {
+    margin-left: 0.3em;
+    font-size: 0.75rem;
+    opacity: 0.75;
+  }
+  .filters button:hover,
+  .filters button[aria-pressed='true'] {
+    color: var(--fg);
+  }
+  .filters button[aria-pressed='true']::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -2px;
+    height: 1.5px;
+    border-radius: 1px;
+    background: var(--accent);
+  }
+  .sort select {
+    padding-right: 1.1rem;
+    background: no-repeat right center / 0.7rem
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%2385827b' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+  }
+  .sort select:hover {
+    color: var(--fg);
+  }
+  .wall {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: 2rem 1.25rem;
+  }
+  @media (max-width: 34rem) {
+    .wall {
+      grid-template-columns: repeat(auto-fill, minmax(6.25rem, 1fr));
+      gap: 1.5rem 0.9rem;
+    }
+  }
+  .wall li[hidden] {
+    display: none;
+  }
+</style>
+
+<script>
+  const wall = document.querySelector<HTMLUListElement>('.wall');
+  const buttons = [...document.querySelectorAll<HTMLButtonElement>('.filters button')];
+  const select = document.querySelector<HTMLSelectElement>('.sort select');
+  const empty = document.querySelector<HTMLElement>('.empty');
+  if (wall) {
+    const items = [...wall.children] as HTMLLIElement[];
+    let filter = 'all';
+    const apply = () => {
+      const by = select?.value ?? 'activity';
+      const num = (el: HTMLElement, k: string) => Number(el.dataset[k] ?? 0);
+      const sorted = [...items].sort((a, b) =>
+        by === 'activity' ? num(a, 'i') - num(b, 'i') : num(b, by) - num(a, by) || num(a, 'i') - num(b, 'i'),
+      );
+      let shown = 0;
+      for (const li of sorted) {
+        const ok = filter === 'all' || (filter === 'review' ? 'review' in li.dataset : li.dataset.status === filter);
+        li.hidden = !ok;
+        if (ok) shown++;
+        wall.append(li);
+      }
+      if (empty) empty.hidden = shown > 0;
+    };
+    // 筛选/排序时卡片平滑换位（支持 View Transitions 的浏览器）
+    const run = () => {
+      if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) return apply();
+      items.forEach((li, i) => (li.style.viewTransitionName = `wall-${i}`));
+      document.startViewTransition(apply).finished.finally(() => items.forEach((li) => (li.style.viewTransitionName = '')));
+    };
+    buttons.forEach((b) =>
+      b.addEventListener('click', () => {
+        filter = b.dataset.filter ?? 'all';
+        buttons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        run();
+      }),
+    );
+    select?.addEventListener('change', run);
+  }
+</script>

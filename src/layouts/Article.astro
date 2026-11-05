@@ -50,6 +50,7 @@ const hasToc = showToc && toc.length >= 3;
         {minutes && <span>约 {minutes} 分钟</span>}
       </div>
       {tags.length > 0 && <div class="tags article-tags">{tags.map((t) => <span>{t}</span>)}</div>}
+      <slot name="meta" />
     </header>
 
     {

@@ -1,0 +1,141 @@
+---
+// 游戏评测：只有写了正文的游戏才有这一页
+import { render } from 'astro:content';
+import Article from '../../layouts/Article.astro';
+import Viz from '../../components/Viz.astro';
+import { readingMinutes, vtName, fmtDate } from '../../lib/content';
+import { getReviews, STATUS_LABEL, fmtHours, type Game } from '../../lib/games';
+
+export async function getStaticPaths() {
+  const reviews = await getReviews();
+  return reviews.map((g, i) => ({
+    params: { slug: g.entry!.id },
+    props: { g, newer: reviews[i - 1], older: reviews[i + 1] },
+  }));
+}
+
+interface Props {
+  g: Game;
+  newer?: Game;
+  older?: Game;
+}
+const { g, newer, older } = Astro.props;
+const e = g.entry!;
+const { Content, headings } = await render(e);
+const steamId = e.data.steam;
+const facts = [
+  ['状态', g.status && STATUS_LABEL[g.status]],
+  ['评分', g.rating != null && `${g.rating.toFixed(1)} / 10`],
+  ['平台', g.platform],
+  ['时长', fmtHours(g.hours)],
+  ['成就', g.ach && g.ach[1] > 0 && `${g.ach[0]} / ${g.ach[1]}`],
+  ['通关', g.finished && fmtDate(g.finished)],
+].filter(([, v]) => v) as [string, string][];
+const onerror =
+  "var f=this.dataset.fallback;if(f){this.removeAttribute('data-fallback');this.src=f}else{this.closest('.sheet').classList.add('no-img')}";
+---
+
+<Article
+  title={g.title}
+  description={g.description}
+  date={e.data.date}
+  updated={e.data.updated}
+  tags={e.data.tags}
+  minutes={readingMinutes(e.body)}
+  headings={headings}
+  showToc={e.data.toc}
+  vt={vtName('game', e.id)}
+>
+  <p slot="kicker" class="kicker"><a href="/games/">游戏墙</a></p>
+  <div slot="meta" class:list={['sheet', { 'no-img': !g.cover }]}>
+    {g.cover && <img src={g.cover} data-fallback={g.coverFallback} alt={`${g.title} 封面`} referrerpolicy="no-referrer" onerror={onerror} />}
+    <dl>
+      {
+        facts.map(([k, v]) => (
+          <div>
+            <dt>{k}</dt>
+            <dd class="num">{v}</dd>
+          </div>
+        ))
+      }
+    </dl>
+    {
+      steamId && (
+        <a class="store" href={`https://store.steampowered.com/app/${steamId}/`} target="_blank" rel="noopener">
+          Steam 商店页 ↗
+        </a>
+      )
+    }
+  </div>
+
+  <Content components={{ Viz }} />
+  {
+    (older || newer) && (
+      <nav slot="after" class="pager">
+        {older ? <a href={older.href}><span>← 更早的评测</span>{older.title}</a> : <span />}
+        {newer && <a class="next" href={newer.href}><span>更新的评测 →</span>{newer.title}</a>}
+      </nav>
+    )
+  }
+</Article>
+
+<style>
+  .kicker {
+    margin: 0 0 0.6rem;
+    font-size: 0.875rem;
+  }
+  .kicker a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .kicker a:hover {
+    color: var(--accent);
+  }
+  .sheet {
+    display: grid;
+    grid-template-columns: 6.5rem 1fr;
+    grid-template-rows: 1fr auto;
+    gap: 0.5rem 1.4rem;
+    margin-top: 1.75rem;
+  }
+  .sheet img {
+    grid-row: span 2;
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .sheet.no-img {
+    grid-template-columns: 1fr;
+  }
+  .sheet.no-img img {
+    display: none;
+  }
+  dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+    gap: 0.9rem 1.2rem;
+    margin: 0;
+    align-content: start;
+  }
+  dt {
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  dd {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--fg);
+  }
+  .store {
+    align-self: end;
+    font-size: 0.8125rem;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .store:hover {
+    color: var(--accent);
+  }
+</style>

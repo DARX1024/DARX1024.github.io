@@ -1,0 +1,207 @@
+---
+// 游戏墙上的一张海报：默认去色，悬停时恢复颜色；底边一条细线表示成就进度
+import { STATUS_LABEL, fmtHours, type Game } from '../lib/games';
+import { vtStyle } from '../lib/content';
+
+interface Props {
+  g: Game;
+  /** 首屏的几张不懒加载 */
+  eager?: boolean;
+  /** 标题参与页面切换动画（同一页里同一款游戏只能有一处开启） */
+  vt?: boolean;
+}
+const { g, eager = false, vt = false } = Astro.props;
+const review = !!g.href && !g.external;
+const pct = g.ach && g.ach[1] > 0 ? g.ach[0] / g.ach[1] : undefined;
+const meta = [g.status && STATUS_LABEL[g.status], fmtHours(g.hours) || (g.platform !== 'Steam' ? g.platform : '')].filter(Boolean);
+const Tag = g.href ? 'a' : 'div';
+// 竖版封面加载失败 → 换横版头图 → 再失败就显示文字封面
+const onerror =
+  "var f=this.dataset.fallback;if(f){this.removeAttribute('data-fallback');this.src=f;this.classList.add('wide')}else{this.parentNode.classList.add('no-img')}";
+---
+
+<Tag
+  class:list={['game', { review, recent: g.recent }]}
+  href={g.href}
+  target={g.external ? '_blank' : undefined}
+  rel={g.external ? 'noopener' : undefined}
+  title={g.external ? `${g.title}（Steam 商店）` : undefined}
+>
+  <span class:list={['poster', { 'no-img': !g.cover }]}>
+    {
+      g.cover && (
+        <img
+          src={g.cover}
+          data-fallback={g.coverFallback}
+          alt=""
+          loading={eager ? 'eager' : 'lazy'}
+          decoding="async"
+          referrerpolicy="no-referrer"
+          onerror={onerror}
+        />
+      )
+    }
+    <span class="poster-text" aria-hidden="true">{g.title}</span>
+    {g.rating != null && <span class="rating num" title="评分（10 分制）">{g.rating.toFixed(1)}</span>}
+    {
+      pct != null && (
+        <span class="ach" title={`成就 ${g.ach![0]} / ${g.ach![1]}`}>
+          <span style={`transform:scaleX(${pct})`} />
+        </span>
+      )
+    }
+  </span>
+  <span class="g-title" style={vt && review ? vtStyle('game', g.entry!.id) : undefined}>
+    {g.title}
+    {
+      review && (
+        <svg class="pen" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-label="有评测">
+          <path d="M3 13l1-3.5 7-7a1.4 1.4 0 0 1 2 2l-7 7z" />
+          <path d="M9.5 4l2.5 2.5" />
+        </svg>
+      )
+    }
+  </span>
+  {meta.length > 0 && <span class="g-meta">{meta.join(' · ')}</span>}
+</Tag>
+
+<style>
+  .game {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    text-decoration: none;
+    color: inherit;
+  }
+  .poster {
+    position: relative;
+    display: block;
+    aspect-ratio: 2 / 3;
+    margin-bottom: 0.55rem;
+    overflow: hidden;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-soft);
+    transition: border-color 0.25s, transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.35s;
+  }
+  .poster img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* 去色 + 一点暖调，和站点的线稿/纸张气质一致；悬停时恢复原色 */
+    filter: grayscale(1) sepia(0.12) contrast(0.96) brightness(1.02);
+    transition: filter 0.5s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  :global(:root[data-theme='dark']) .poster img {
+    filter: grayscale(1) sepia(0.28) brightness(0.72) contrast(1.05);
+  }
+  /* 只有横版头图时：居中放在海报中间，上下留白 */
+  .poster img.wide {
+    object-fit: contain;
+  }
+  .poster.no-img img {
+    display: none;
+  }
+  /* 文字封面：没有图或图加载失败时显示 */
+  .poster-text {
+    position: absolute;
+    inset: 0;
+    display: none;
+    place-items: end start;
+    padding: 0.9rem;
+    font-family: var(--font-heading);
+    font-size: 1.05rem;
+    line-height: 1.3;
+    color: var(--accent);
+    background: radial-gradient(120% 90% at 100% 0%, var(--accent-soft), transparent 65%);
+  }
+  .poster.no-img .poster-text {
+    display: grid;
+  }
+  .rating {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    font-family: var(--font-heading);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--fg);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+  /* 成就进度：海报底边的一条细线 */
+  .ach {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+  }
+  .ach span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transform-origin: 0 50%;
+  }
+
+  a.game:hover .poster {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.45);
+  }
+  a.game:hover .poster img,
+  a.game:focus-visible .poster img {
+    filter: none;
+    transform: scale(1.03);
+  }
+  /* 触屏没有悬停：保留一点颜色 */
+  @media (hover: none) {
+    .poster img,
+    :global(:root[data-theme='dark']) .poster img {
+      filter: saturate(0.4) brightness(0.9);
+    }
+  }
+
+  .g-title {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  a.game:hover .g-title {
+    color: var(--accent);
+  }
+  .pen {
+    display: inline-block;
+    vertical-align: -0.05em;
+    margin-left: 0.3em;
+    color: var(--accent);
+  }
+  .g-meta {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .recent .g-meta::before {
+    content: '';
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-right: 0.4em;
+    vertical-align: 0.15em;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+</style>
