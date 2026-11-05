@@ -27,6 +27,7 @@ interface SteamGame {
   ach?: [number, number]; // [已解锁, 总数]
   cover?: string; // 竖版封面（600×900）
   header?: string; // 横版头图，竖版缺失时的后备
+  hero?: string; // 横幅大图（3840×1240）
 }
 interface SteamData {
   updatedAt?: string;
@@ -42,6 +43,7 @@ export const steamUpdatedAt = steam.updatedAt ? new Date(steam.updatedAt) : unde
 const CDN = 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps';
 const steamCover = (id: number) => `${CDN}/${id}/library_600x900.jpg`;
 const steamHeader = (id: number) => `${CDN}/${id}/header.jpg`;
+const steamHero = (id: number) => `${CDN}/${id}/library_hero.jpg`;
 
 // attachments 等内容目录里的图片，供 cover: 封面.jpg 这种写法查找
 const images = import.meta.glob<{ default: ImageMetadata }>('/src/content/**/*.{png,jpg,jpeg,webp,avif}');
@@ -55,6 +57,12 @@ async function localCover(name: string) {
 
 export interface Game {
   key: string;
+  /** 页面里的锚点 id：建档的用文件名，自动收录的用 app-<appid> */
+  slug: string;
+  appid?: number;
+  /** 横幅大图（顶部焦点区和详情卡用） */
+  hero?: string;
+  last?: Date;
   title: string;
   status?: Status;
   rating?: number;
@@ -102,6 +110,10 @@ async function load(): Promise<Game[]> {
       const last = s?.last ? new Date(s.last * 1000) : undefined;
       return {
         key: `e:${e.id}`,
+        slug: e.id,
+        appid: d.steam,
+        hero: d.steam ? s?.hero ?? steamHero(d.steam) : undefined,
+        last,
         title: titleOf(e),
         status: d.status ?? (s?.recent ? 'playing' : undefined),
         rating: d.rating,
@@ -130,6 +142,10 @@ async function load(): Promise<Game[]> {
           .filter((g) => !listed.has(g.appid) && !hiddenIds.has(g.appid) && (g.minutes ?? 0) >= min * 60)
           .map((g) => ({
             key: `s:${g.appid}`,
+            slug: `app-${g.appid}`,
+            appid: g.appid,
+            hero: g.hero ?? steamHero(g.appid),
+            last: g.last ? new Date(g.last * 1000) : undefined,
             title: g.name,
             status: g.recent ? ('playing' as const) : undefined,
             platform: 'Steam',
@@ -163,3 +179,4 @@ export async function hasLife() {
 
 export const fmtHours = (h?: number) =>
   h == null ? '' : h < 1 ? '不到 1 小时' : `${h < 10 ? Math.round(h * 10) / 10 : Math.round(h).toLocaleString('en-US')} 小时`;
+

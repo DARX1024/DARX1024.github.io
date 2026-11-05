@@ -175,6 +175,7 @@ iframe 高度会根据内容自动调整，不需要做什么。以上都是可�
 - Steam 游戏填 `steam: <appid>`（或者直接贴商店链接），时长、成就、封面自动同步
 - 非 Steam 游戏不填 `steam`，用 `platform`、`hours`、`cover` 手动写；`cover` 可以是图片链接，也可以是 attachments/ 里的文件名
 - Steam 库里玩过 3 小时以上的游戏即使没建档也会自动上墙（只有封面和时长）。阈值在 `site.config.ts` 的 `GAMES.libraryMinHours` 改，设为 `false` 关掉。想藏某一款：给它建档并写 `publish: false`
+- 游戏墙页面：顶部是最近在玩的那款（Steam 横幅大图），下面按「在玩 / 最近通关 / 私藏高分 / 玩得最久」分几排横向货架，最后是全部游戏。点任意封面弹出详情卡；`/games/#<文件名>` 或 `/games/#app-<appid>` 可以直接打开某一款
 - 墙上的状态和评分以你写的为准。Steam 没有「通关」这个数据，所以通关要手动标；最近两周玩过且没标状态的会自动显示为「在玩」
 
 ### Steam 同步

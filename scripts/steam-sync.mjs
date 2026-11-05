@@ -99,7 +99,12 @@ async function storeInfo(appids) {
     for (const it of r?.response?.store_items ?? []) {
       const a = it.assets ?? {};
       const url = (file) => (file && a.asset_url_format ? CDN + a.asset_url_format.replace('${FILENAME}', file) : undefined);
-      info.set(it.appid ?? it.id, { name: it.name, cover: url(a.library_capsule ?? a.library_capsule_2x), header: url(a.header) });
+      info.set(it.appid ?? it.id, {
+        name: it.name,
+        cover: url(a.library_capsule ?? a.library_capsule_2x),
+        header: url(a.header),
+        hero: url(a.library_hero), // 横幅大图（3840×1240），游戏墙顶部和详情卡用
+      });
     }
   }
   return info;
@@ -175,6 +180,7 @@ async function main() {
     g.name = s?.name || g.name || o?.name;
     g.cover = s?.cover ?? o?.cover;
     g.header = s?.header ?? o?.header;
+    g.hero = s?.hero ?? o?.hero;
   }
 
   const clean = [...games.values()]
