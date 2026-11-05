@@ -10,7 +10,7 @@ const viz = (await getCollection('viz')).sort((a, b) => (b.data.date?.valueOf() 
   <h1 class="page-title">交互可视化</h1>
   <p class="page-lede">一些可以直接上手拖动的小演示。每个都可以嵌入文章，也可以单独打开。</p>
   <div class="viz-grid">
-    {viz.map((v) => <VizCard v={v} meta />)}
+    {viz.map((v) => <VizCard v={v} meta vt />)}
   </div>
   {viz.length === 0 && <p class="muted">把 HTML 文件放进 viz-raw/ 就会出现在这里。</p>}
 </Base>

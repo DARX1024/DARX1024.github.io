@@ -3,6 +3,80 @@ import Base from '../layouts/Base.astro';
 ---
 
 <Base title="页面不存在">
-  <h1 class="page-title">404</h1>
-  <p class="page-lede">这个页面不存在，或者还没有发布。<a href="/">回到首页</a></p>
+  <figure class="lost" aria-hidden="true">
+    <!-- 一颗偏离轨道的线稿卫星，和首页地球仪同一种画法 -->
+    <svg viewBox="0 0 280 170" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <path class="orbit" d="M6 150 C 70 70, 190 40, 274 58" stroke-dasharray="1.5 6" />
+      <g class="stars" stroke-width="1">
+        <path d="M34 28v8M30 32h8M226 22v6M223 25h6M246 132v8M242 136h8" />
+        <circle cx="96" cy="20" r="0.9" fill="currentColor" stroke="none" />
+        <circle cx="180" cy="142" r="0.9" fill="currentColor" stroke="none" />
+        <circle cx="262" cy="96" r="0.9" fill="currentColor" stroke="none" />
+        <circle cx="14" cy="88" r="0.9" fill="currentColor" stroke="none" />
+      </g>
+      <g class="planet" stroke-width="1.1">
+        <circle cx="46" cy="128" r="10" />
+        <path d="M26 128a20 5 0 0 0 40 0" />
+        <path d="M26 128a20 5 0 0 1 11.06-4.47M54.94 123.53A20 5 0 0 1 66 128" />
+        <path d="M40 121l8 8M43 119l8 8M38 125l6 6" stroke-width="0.6" opacity="0.6" />
+      </g>
+      <g class="sat">
+        <g transform="translate(150 80) rotate(-18)" stroke-width="1.2">
+          <rect x="-13" y="-10" width="26" height="20" rx="2" />
+          <path d="M-13 -3h26M-13 4h26" stroke-width="0.6" opacity="0.7" />
+          <path d="M-13 0h-7M13 0h7" />
+          <rect x="-56" y="-9" width="36" height="18" />
+          <rect x="20" y="-9" width="36" height="18" />
+          <path d="M-47 -9v18M-38 -9v18M-29 -9v18M-56 0h36M29 -9v18M38 -9v18M47 -9v18M20 0h36" stroke-width="0.6" opacity="0.75" />
+          <path d="M0 -10v-6" />
+          <path d="M-8 -16a8 4.5 0 0 0 16 0" />
+          <path d="M0 -16v-9" stroke-width="0.8" />
+          <circle cx="0" cy="-26.5" r="1.4" />
+          <path d="M0 10v6" />
+          <circle cx="0" cy="18" r="1.6" />
+        </g>
+      </g>
+    </svg>
+  </figure>
+  <h1 class="page-title num">404</h1>
+  <p class="page-lede">这颗卫星偏离了轨道：页面不存在，或者还没有发布。<a href="/">回到首页</a></p>
 </Base>
+
+<style>
+  .lost {
+    margin: 1rem 0 2rem;
+    max-width: 22rem;
+    color: var(--fg-soft);
+  }
+  .lost svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  .orbit,
+  .stars,
+  .planet {
+    color: var(--muted);
+  }
+  .page-title {
+    font-size: 2.5rem;
+    letter-spacing: 0.02em;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .sat {
+      animation: drift 9s ease-in-out infinite;
+      transform-box: fill-box;
+      transform-origin: 50% 50%;
+    }
+  }
+  @keyframes drift {
+    0%,
+    100% {
+      transform: translate(0, 0) rotate(0deg);
+    }
+    50% {
+      transform: translate(6px, -5px) rotate(5deg);
+    }
+  }
+</style>

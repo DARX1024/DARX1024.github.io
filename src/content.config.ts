@@ -59,6 +59,7 @@ const viz = defineCollection({
     tags: z.array(z.string()).default([]),
     height: z.number().optional(),
     thumb: z.string().optional(),
+    thumbLight: z.string().optional(),
     file: z.string(),
   }),
 });

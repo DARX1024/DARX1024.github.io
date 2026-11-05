@@ -1,6 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { getPosts, titleOf, fmtDate } from '../../lib/content';
+import { getPosts, titleOf, fmtDate, vtStyle } from '../../lib/content';
 
 const posts = await getPosts();
 const byYear = Map.groupBy(posts, (p) => p.data.date?.getUTCFullYear() ?? '未注明日期');
@@ -17,7 +17,7 @@ const byYear = Map.groupBy(posts, (p) => p.data.date?.getUTCFullYear() ?? '未�
           {list.map((p) => (
             <li>
               <time datetime={p.data.date?.toISOString()}>{fmtDate(p.data.date).slice(5)}</time>
-              <a href={`/blog/${p.id}/`}>
+              <a href={`/blog/${p.id}/`} style={vtStyle('post', p.id)}>
                 {titleOf(p)}
               </a>
               {p.data.description && <span class="desc">{p.data.description}</span>}

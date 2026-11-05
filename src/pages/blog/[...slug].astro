@@ -2,7 +2,7 @@
 import { render } from 'astro:content';
 import Article from '../../layouts/Article.astro';
 import Viz from '../../components/Viz.astro';
-import { getPosts, titleOf, readingMinutes, type Post } from '../../lib/content';
+import { getPosts, titleOf, readingMinutes, vtName, type Post } from '../../lib/content';
 
 export async function getStaticPaths() {
   const posts = await getPosts();
@@ -30,6 +30,7 @@ const { Content, headings } = await render(post);
   minutes={readingMinutes(post.body)}
   headings={headings}
   showToc={post.data.toc}
+  vt={vtName('post', post.id)}
 >
   <Content components={{ Viz }} />
   {

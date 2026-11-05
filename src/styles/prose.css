@@ -113,10 +113,14 @@
 }
 
 .prose hr {
+  /* 分节符：一颗带星环的小行星，和首页地球仪同一种线稿语言 */
   border: 0;
   margin: 3.5em auto;
   width: 4rem;
-  border-top: 1px solid var(--border);
+  height: 1.4rem;
+  background: var(--muted);
+  -webkit-mask: var(--orbit-glyph) center / contain no-repeat;
+  mask: var(--orbit-glyph) center / contain no-repeat;
 }
 
 .prose img {
@@ -307,7 +311,7 @@ details.callout[open] > summary::after {
   min-height: 160px;
   border: 0;
   background: transparent;
-  color-scheme: normal;
+  /* 不写 color-scheme，让它继承页面：和 iframe 内文档一致时浏览器才不会给它铺一层不透明底色 */
 }
 figure.viz figcaption a {
   color: var(--muted);
@@ -320,5 +324,61 @@ figure.viz figcaption a:hover {
 @media (min-width: 64rem) {
   .prose figure.viz {
     margin-inline: -4rem;
+  }
+}
+
+/* ---------- 章节编号：宽屏悬挂在左边距外 ---------- */
+.prose .h-num {
+  font-family: var(--font-heading);
+  font-variant-numeric: oldstyle-nums;
+  color: var(--muted);
+}
+@media (min-width: 64rem) {
+  .prose h2,
+  .prose h3 {
+    position: relative;
+  }
+  .prose .h-num {
+    position: absolute;
+    right: 100%;
+    margin-right: 0.8em;
+    white-space: nowrap;
+  }
+}
+
+/* ---------- 旁注：宽屏把脚注放到正文右侧（见 Article.astro） ---------- */
+.sidenote {
+  display: none;
+}
+@media (min-width: 76rem) {
+  .prose.has-sidenotes {
+    position: relative;
+  }
+  .sidenote {
+    display: block;
+    position: absolute;
+    left: calc(100% + 3rem);
+    width: 13rem;
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    color: var(--fg-soft);
+  }
+  .sidenote > * {
+    margin: 0;
+  }
+  .sidenote > * + * {
+    margin-top: 0.4em;
+  }
+  .sidenote .sn-num {
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    margin-right: 0.35em;
+  }
+  .sidenote [data-footnote-backref] {
+    display: none;
+  }
+  /* 旁注都放到页边后，文末脚注区就不需要了 */
+  .prose.has-sidenotes .footnotes {
+    display: none;
   }
 }

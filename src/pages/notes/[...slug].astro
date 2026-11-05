@@ -2,7 +2,7 @@
 import { render } from 'astro:content';
 import Article from '../../layouts/Article.astro';
 import Viz from '../../components/Viz.astro';
-import { getNotes, getSeries, seriesIdOf, titleOf, readingMinutes, type Note, type Series } from '../../lib/content';
+import { getNotes, getSeries, seriesIdOf, titleOf, readingMinutes, vtName, type Note, type Series } from '../../lib/content';
 
 export async function getStaticPaths() {
   const [notes, series] = await Promise.all([getNotes(), getSeries()]);
@@ -38,6 +38,7 @@ const position = lecture != null ? `第 ${lecture} 讲` : series && series.notes
   minutes={readingMinutes(note.body)}
   headings={headings}
   showToc={note.data.toc}
+  vt={vtName('note', note.id)}
 >
   <p slot="kicker" class="kicker">
     <a href="/notes/">笔记</a>
