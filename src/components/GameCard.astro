@@ -265,10 +265,12 @@ const onerror =
     }
   }
 
+  /* 海报下的游戏名是小字号的标签，不用标题的宋体：小字加粗的宋体发虚，
+     而且一整面墙的游戏名会让没有系统宋体的设备把中文字体几乎整套下载下来 */
   .g-title {
     position: relative;
     z-index: 1;
-    font-family: var(--font-heading);
+    font-family: var(--font-body);
     font-weight: 600;
     font-size: 0.9375rem;
     line-height: 1.4;

@@ -1,6 +1,8 @@
 ---
-// 标题西文字体：只加载拉丁字符的 600 字重（约 24KB），中文仍用系统字体
+// 标题西文字体：只加载拉丁字符的 600 字重（约 24KB）
 import '@fontsource/newsreader/latin-600.css';
+// 标题中文宋体的后备：只有系统里没有宋体的设备才会下载，而且只下载标题用到的字所在的分片（见 global.css）
+import '@fontsource/noto-serif-sc/600.css';
 import '../styles/global.css';
 import { SITE, NAV } from '../site.config';
 import { getPosts } from '../lib/content';

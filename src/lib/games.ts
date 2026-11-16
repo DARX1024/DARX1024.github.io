@@ -135,11 +135,12 @@ async function load(): Promise<Game[]> {
 
   // 没建档、但在 Steam 上玩得够久的游戏，也自动上墙
   const min = GAMES.libraryMinHours;
+  const hide = new Set(GAMES.hide);
   const fromLibrary: Game[] =
     min === false
       ? []
       : (steam.games ?? [])
-          .filter((g) => !listed.has(g.appid) && !hiddenIds.has(g.appid) && (g.minutes ?? 0) >= min * 60)
+          .filter((g) => !listed.has(g.appid) && !hiddenIds.has(g.appid) && !hide.has(g.appid) && (g.minutes ?? 0) >= min * 60)
           .map((g) => ({
             key: `s:${g.appid}`,
             slug: `app-${g.appid}`,

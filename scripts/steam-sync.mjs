@@ -6,6 +6,8 @@
 // - 没有 STEAM_API_KEY：只补全 src/content/games/ 里建档游戏的名字和封面（商店接口不需要 Key），不报错
 // - SteamID：环境变量 STEAM_ID（17 位数字），否则从 src/site.config.ts 的 steamProfile 解析
 // - 数据和上次一样时不改文件，避免每天产生空提交
+// - 不写进 steam.json 的游戏：Steam 标为成人内容的，以及 site.config.ts 里 GAMES.hide 列出的。
+//   建了档（src/content/games/）的不受影响：建档算作明确想放
 // 不依赖任何 npm 包，Node 18+ 直接运行。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +18,9 @@ const GAMES_DIR = path.join(ROOT, 'src/content/games');
 const CDN = 'https://shared.akamai.steamstatic.com/store_item_assets/';
 const API = 'https://api.steampowered.com';
 const KEY = process.env.STEAM_API_KEY?.trim();
+// Steam 的内容描述符：3 = 仅限成人的色情内容，4 = 频繁的裸露或色情内容。
+// 1（部分裸露或色情内容，巫师 3、赛博朋克这类）和 2、5（暴力、一般成人内容）不算
+const ADULT_DESCRIPTORS = new Set([3, 4]);
 const ACH_LIMIT = 300; // 最多查多少款游戏的成就（按时长从高到低），防止库特别大时请求太多
 
 const log = (...a) => console.log('[steam]', ...a);
@@ -70,6 +75,14 @@ function listedAppIds() {
   return ids;
 }
 
+/** site.config.ts 里 GAMES.hide 列出的 appid */
+function hiddenAppIds() {
+  const cfg = fs.readFileSync(path.join(ROOT, 'src/site.config.ts'), 'utf8');
+  const body = cfg.match(/\bhide:\s*\[([\s\S]*?)\]/)?.[1] ?? '';
+  const noComments = body.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  return new Set((noComments.match(/\d+/g) ?? []).map(Number));
+}
+
 async function steamId() {
   if (process.env.STEAM_ID?.trim()) return process.env.STEAM_ID.trim();
   const cfg = fs.readFileSync(path.join(ROOT, 'src/site.config.ts'), 'utf8');
@@ -83,7 +96,7 @@ async function steamId() {
   return r.response.steamid;
 }
 
-/** 商店信息：中文名 + 竖版封面 / 横版头图的真实地址（新游戏的图片路径带哈希，不能直接拼） */
+/** 商店信息：中文名 + 竖版封面 / 横版头图的真实地址（新游戏的图片路径带哈希，不能直接拼）+ 是否成人内容 */
 async function storeInfo(appids) {
   const info = new Map();
   for (let i = 0; i < appids.length; i += 50) {
@@ -104,6 +117,7 @@ async function storeInfo(appids) {
         cover: url(a.library_capsule ?? a.library_capsule_2x),
         header: url(a.header),
         hero: url(a.library_hero), // 横幅大图（3840×1240），游戏墙顶部和详情卡用
+        adult: (it.content_descriptorids ?? []).some((d) => ADULT_DESCRIPTORS.has(d)),
       });
     }
   }
@@ -172,16 +186,27 @@ async function main() {
   // 建档但不在库里的（比如家庭共享、已退款、想玩的），也要有名字和封面
   for (const id of listed) if (!games.has(id)) games.set(id, { appid: id, name: oldById.get(id)?.name ?? String(id) });
 
+  const hidden = hiddenAppIds();
   const info = await storeInfo([...games.keys()]);
-  for (const g of games.values()) {
+  let skipped = 0;
+  for (const g of [...games.values()]) {
     const s = info.get(g.appid);
     const o = oldById.get(g.appid);
+    // 没建档的游戏：成人内容和 hide 名单里的不写进文件。
+    // 商店信息这次没拿到、上次的数据里也没有，说明无法确认内容分级，先不收，下次同步再看
+    if (!listed.has(g.appid) && (hidden.has(g.appid) || s?.adult || (!s && !o))) {
+      games.delete(g.appid);
+      skipped++;
+      continue;
+    }
     // 商店接口偶尔失败：沿用上次的数据
     g.name = s?.name || g.name || o?.name;
     g.cover = s?.cover ?? o?.cover;
     g.header = s?.header ?? o?.header;
     g.hero = s?.hero ?? o?.hero;
   }
+
+  if (skipped) log(`跳过 ${skipped} 款（成人内容、hide 名单或无法确认分级）`);
 
   const clean = [...games.values()]
     .map((g) => Object.fromEntries(Object.entries(g).filter(([, v]) => v !== undefined)))
