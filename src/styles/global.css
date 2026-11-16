@@ -2,8 +2,7 @@
    设计令牌
    =========================================================== */
 :root {
-  /* 字体：只用系统字体，不加载任何中文 webfont。
-     西文字体放在前面，中文字符自动回落到后面的中文字体。 */
+  /* 字体：正文只用系统字体。西文字体放在前面，中文字符自动回落到后面的中文字体。 */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'Inter', Roboto, Arial,
     'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Microsoft YaHei UI',
     'Microsoft YaHei', 'WenQuanYi Micro Hei', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
@@ -13,10 +12,14 @@
     'PingFang SC', 'Microsoft YaHei', monospace;
 
   --font-body: var(--font-sans); /* 想要衬线正文就改成 var(--font-serif) */
-  /* 标题：西文用 Newsreader（只加载拉丁字符、单一字重，约 24KB），中文仍回落到黑体
-     （Windows 没有好看的中文衬线，宋体加粗很难看） */
-  --font-heading: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Source Serif 4', Georgia, 'PingFang SC',
-    'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', serif;
+  /* 标题：西文用 Newsreader（只加载拉丁字符、单一字重，约 24KB），中文用宋体。
+     macOS / iOS 用系统自带的宋体（Songti SC），装了思源宋体的机器用思源宋体，都不需要下载；
+     其余设备（主要是 Windows，自带的中宋加粗很难看）才下载 Noto Serif SC。它按 unicode-range 切成约一百片，
+     浏览器只取页面标题里用到的字所在的那几片（见 layouts/Base.astro 里的 import）。
+     下载完成前先用黑体顶着，所以最后的回落是黑体而不是 serif */
+  --font-heading: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Source Serif 4', Georgia, 'Songti SC',
+    'Noto Serif CJK SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Noto Serif SC', 'PingFang SC', 'Microsoft YaHei UI',
+    'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
 
   --measure: 40rem; /* 正文行宽：约 38 个汉字 / 75 个英文字符 */
   --wide: 56rem;

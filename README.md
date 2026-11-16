@@ -174,8 +174,9 @@ iframe 高度会根据内容自动调整，不需要做什么。以上都是可�
 - 写了正文就有评测页 `/games/<文件名>/`；只写 frontmatter 就只上墙，点封面跳 Steam 商店
 - Steam 游戏填 `steam: <appid>`（或者直接贴商店链接），时长、成就、封面自动同步
 - 非 Steam 游戏不填 `steam`，用 `platform`、`hours`、`cover` 手动写；`cover` 可以是图片链接，也可以是 attachments/ 里的文件名
-- Steam 库里玩过 3 小时以上的游戏即使没建档也会自动上墙（只有封面和时长）。阈值在 `site.config.ts` 的 `GAMES.libraryMinHours` 改，设为 `false` 关掉。想藏某一款：给它建档并写 `publish: false`
-- 游戏墙页面：顶部是最近在玩的那款（Steam 横幅大图），下面按「在玩 / 最近通关 / 私藏高分 / 玩得最久」分几排横向货架，最后是全部游戏。点任意封面弹出详情卡；`/games/#<文件名>` 或 `/games/#app-<appid>` 可以直接打开某一款
+- Steam 库里玩过 10 小时以上的游戏即使没建档也会自动上墙（只有封面和时长）。阈值在 `site.config.ts` 的 `GAMES.libraryMinHours` 改，设为 `false` 关掉
+- 成人内容不上墙：同步脚本会跳过 Steam 标为「仅限成人」或「频繁的裸露或色情内容」的游戏，不写进 `steam.json`。自动识别不到的，或者单纯不想放的（比如壁纸引擎），把 appid 加进 `site.config.ts` 的 `GAMES.hide`。建了档的游戏不受这两条影响
+- 游戏墙页面以评测为中心：顶部是最新的一篇评测（Steam 横幅大图），紧接着是其余评测的列表；一篇评测都没有时顶部退回到最近在玩的那款。再往下按「在玩 / 最近通关 / 私藏高分 / 玩得最久」分几排横向货架，最后是全部游戏（写了评测的排在前面）。点任意封面弹出详情卡；`/games/#<文件名>` 或 `/games/#app-<appid>` 可以直接打开某一款
 - 墙上的状态和评分以你写的为准。Steam 没有「通关」这个数据，所以通关要手动标；最近两周玩过且没标状态的会自动显示为「在玩」
 
 ### Steam 同步
@@ -196,7 +197,7 @@ STEAM_API_KEY=你的key node scripts/steam-sync.mjs
 ## 排版说明
 
 - 默认暗色（暖棕黑 + 琥珀），右上角可切换亮色，选择会被记住
-- 字体只用系统字体：正文西文 → 系统无衬线（SF / Segoe UI），中文 → 苹方 / 微软雅黑 / 思源黑体；标题西文用系统衬线。不加载任何 webfont（KaTeX 的数学字体除外，按需加载）
+- 字体：正文只用系统字体，西文 → 系统无衬线（SF / Segoe UI），中文 → 苹方 / 微软雅黑 / 思源黑体。标题西文用 Newsreader，中文用宋体：macOS / iOS 用系统自带的宋体，不需要下载；没有系统宋体的设备（主要是 Windows）按需下载 Noto Serif SC，只取标题里用到的字所在的分片。KaTeX 的数学字体也是按需加载
 - 想要衬线正文：把 `src/styles/global.css` 里的 `--font-body` 改成 `var(--font-serif)`
 - 中西文间距交给浏览器的 `text-autospace`（新版 Chrome/Safari 支持），源文件里不需要手动加空格
 - 中文强调 `*文字*` 显示为着重号（文字下加点），而不是机械倾斜的伪斜体
