@@ -1,34 +1,44 @@
 ---
 import Base from '../../layouts/Base.astro';
 import GameCard from '../../components/GameCard.astro';
-import { getGames, steamUpdatedAt, STATUS_LABEL, fmtHours, type Status, type Game } from '../../lib/games';
+import { getGames, getReviews, steamUpdatedAt, STATUS_LABEL, fmtHours, type Status, type Game } from '../../lib/games';
 import { fmtDate } from '../../lib/content';
 
-const games = await getGames();
+// 这一页以评测为中心：最新一篇评测放在顶部焦点区，其余评测紧跟其后；
+// Steam 自动收录的游戏（只有封面和时长）排在后面，算是背景
+const [all, reviews] = await Promise.all([getGames(), getReviews()]);
+const hasReview = (g: Game) => !!g.href && !g.external;
+// 墙上的默认顺序：写了评测的在前，其余按最近有动静排（sort 是稳定的，组内保持原顺序）
+const games = [...all].sort((a, b) => Number(hasReview(b)) - Number(hasReview(a)));
 const count = (s: Status) => games.filter((g) => g.status === s).length;
 const filters = [
   { key: 'all', label: '全部', n: games.length },
+  { key: 'review', label: '有评测', n: reviews.length },
   ...(Object.keys(STATUS_LABEL) as Status[]).map((s) => ({ key: s, label: STATUS_LABEL[s], n: count(s) })),
-  { key: 'review', label: '有评测', n: games.filter((g) => g.href && !g.external).length },
 ].filter((f) => f.key === 'all' || f.n > 0);
 const totalHours = Math.round(games.reduce((t, g) => t + (g.hours ?? 0), 0));
 
-// 顶部焦点：最近两周玩过的里最后玩的那款；没有就用最近有动静的
+// 顶部焦点：最新的评测；一篇评测都没有时，退回到最近两周玩过的里最后玩的那款（再没有就用最近有动静的）
 const byLast = (a: Game, b: Game) => (b.last?.valueOf() ?? 0) - (a.last?.valueOf() ?? 0);
-const spotlight = [...games.filter((g) => g.recent)].sort(byLast)[0] ?? games.find((g) => g.status !== 'wishlist');
+const lead: Game | undefined = reviews[0];
+const spotlight = lead ?? [...all.filter((g) => g.recent)].sort(byLast)[0] ?? all.find((g) => g.status !== 'wishlist');
+const moreReviews = reviews.slice(1);
+const reviewMeta = (g: Game) =>
+  [g.entry?.data.date && fmtDate(g.entry.data.date), g.status && STATUS_LABEL[g.status], fmtHours(g.hours)].filter(Boolean).join(' · ');
+const posterFail = "this.closest('.rv-poster').classList.add('no-img')";
 
 // 横向货架：像流媒体首页一样按主题分几排；游戏太少时不分
 const shelves =
   games.length < 8
     ? []
     : [
-        { title: '在玩', items: games.filter((g) => g.status === 'playing') },
+        { title: '在玩', items: all.filter((g) => g.status === 'playing') },
         {
           title: '最近通关',
-          items: games.filter((g) => g.status === 'finished').sort((a, b) => (b.finished?.valueOf() ?? 0) - (a.finished?.valueOf() ?? 0)),
+          items: all.filter((g) => g.status === 'finished').sort((a, b) => (b.finished?.valueOf() ?? 0) - (a.finished?.valueOf() ?? 0)),
         },
-        { title: '私藏高分', items: games.filter((g) => (g.rating ?? 0) >= 8.5).sort((a, b) => b.rating! - a.rating!) },
-        { title: '玩得最久', items: [...games].sort((a, b) => (b.hours ?? 0) - (a.hours ?? 0)).slice(0, 14) },
+        { title: '私藏高分', items: all.filter((g) => (g.rating ?? 0) >= 8.5).sort((a, b) => b.rating! - a.rating!) },
+        { title: '玩得最久', items: [...all].sort((a, b) => (b.hours ?? 0) - (a.hours ?? 0)).slice(0, 14) },
       ].filter((s) => s.items.length >= 2);
 
 // 详情卡的数据：点击海报时由脚本填进对话框
@@ -68,28 +78,57 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
             <p class="crumb">
               <a href="/life/">生活</a> / 游戏墙
             </p>
-            <p class="spot-kicker">{spotlight.recent ? '最近在玩' : '最近'}</p>
+            <p class="spot-kicker">{lead ? '最新评测' : spotlight.recent ? '最近在玩' : '最近'}</p>
             <h1 class="spot-title">{spotlight.title}</h1>
             <p class="spot-meta num">
-              {[spotlight.status && STATUS_LABEL[spotlight.status], fmtHours(spotlight.hours) && `累计 ${fmtHours(spotlight.hours)}`, spotlight.ach && spotlight.ach[1] > 0 && `成就 ${spotlight.ach[0]}/${spotlight.ach[1]}`]
+              {[spotlight.rating != null && `${spotlight.rating.toFixed(1)} / 10`, spotlight.status && STATUS_LABEL[spotlight.status], fmtHours(spotlight.hours) && `累计 ${fmtHours(spotlight.hours)}`, spotlight.ach && spotlight.ach[1] > 0 && `成就 ${spotlight.ach[0]}/${spotlight.ach[1]}`]
                 .filter(Boolean)
                 .join(' · ')}
               {spotlight.last && <span data-ago={spotlight.last.valueOf()} />}
             </p>
             {spotlight.description && <p class="spot-desc">{spotlight.description}</p>}
             <p class="spot-actions">
-              <a class="btn primary" href={`#${encodeURIComponent(spotlight.slug)}`} data-open={spotlight.slug}>
+              {lead && <a class="btn primary" href={lead.href}>读评测</a>}
+              <a class:list={['btn', { primary: !lead }]} href={`#${encodeURIComponent(spotlight.slug)}`} data-open={spotlight.slug}>
                 详情
               </a>
-              {spotlight.href && !spotlight.external && <a class="btn" href={spotlight.href}>读评测</a>}
             </p>
           </div>
         </section>
       )
     }
 
+    {
+      moreReviews.length > 0 && (
+        <section class="reviews">
+          <header class="shelf-head">
+            <h2>更多评测</h2>
+          </header>
+          <ul class="review-list">
+            {moreReviews.map((g) => (
+              <li>
+                <a class="review" href={g.href}>
+                  <span class:list={['rv-poster', { 'no-img': !g.cover }]}>
+                    {g.cover && <img src={g.cover} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror={posterFail} />}
+                  </span>
+                  <span class="rv-body">
+                    <span class="rv-title">
+                      {g.title}
+                      {g.rating != null && <span class="rv-score num">{g.rating.toFixed(1)}</span>}
+                    </span>
+                    {g.description && <span class="rv-desc">{g.description}</span>}
+                    <span class="rv-meta num">{reviewMeta(g)}</span>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
     <p class="stats num">
-      {games.length} 款{count('finished') > 0 && ` · 通关 ${count('finished')}`}{totalHours > 0 && ` · 共 ${totalHours.toLocaleString('en-US')} 小时`}
+      {reviews.length > 0 && `${reviews.length} 篇评测 · `}{games.length} 款{count('finished') > 0 && ` · 通关 ${count('finished')}`}{totalHours > 0 && ` · 共 ${totalHours.toLocaleString('en-US')} 小时`}
       {steamUpdatedAt && <span class="muted"> · Steam 数据同步于 {fmtDate(steamUpdatedAt)}</span>}
     </p>
 
@@ -372,6 +411,87 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
     color: var(--bg);
     background: var(--accent);
     border-color: var(--accent);
+  }
+
+  /* ---------- 评测列表 ---------- */
+  .reviews {
+    margin-top: 2.25rem;
+  }
+  .review-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+    gap: 1rem;
+  }
+  .review {
+    display: grid;
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+    gap: 1.1rem;
+    align-items: start;
+    height: 100%;
+    padding: 0.9rem 1.1rem 0.9rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-soft);
+    color: inherit;
+    text-decoration: none;
+    transition: border-color 0.15s;
+  }
+  .review:hover {
+    color: inherit;
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  }
+  .rv-poster {
+    aspect-ratio: 2 / 3;
+    border-radius: 6px;
+    overflow: hidden;
+    background: radial-gradient(120% 90% at 100% 0%, var(--accent-soft), transparent 65%), var(--bg);
+  }
+  .rv-poster img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .rv-poster.no-img img {
+    display: none;
+  }
+  .rv-body {
+    display: grid;
+    gap: 0.3rem;
+    padding-top: 0.15rem;
+  }
+  .rv-title {
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .review:hover .rv-title {
+    color: var(--accent);
+  }
+  .rv-score {
+    margin-left: 0.6em;
+    font-size: 0.9375rem;
+    font-weight: 400;
+    color: var(--accent);
+  }
+  .rv-desc {
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    color: var(--fg-soft);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+  .rv-meta {
+    margin-top: 0.15rem;
+    font-size: 0.8125rem;
+    color: var(--muted);
   }
 
   .stats {
