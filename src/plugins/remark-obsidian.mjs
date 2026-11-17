@@ -52,13 +52,12 @@ export function vizNode(file, { height, caption, query = '' } = {}, warn = () =>
   const meta = findViz(file);
   if (!meta) warn(`找不到可视化 ${file}（应放在 viz-raw/ 下）`);
   height ??= meta?.data.height;
-  caption ||= meta?.data.title;
   const name = meta ? meta.id : file.replace(/(\/index)?\.html$/i, '');
   const src = '/viz-raw/' + (meta ? meta.data.file : file.replace(/^\/+/, '')) + query;
   const props = {
     className: ['viz-frame'],
     src,
-    title: caption || name,
+    title: caption || meta?.data.title || name,
     loading: 'lazy',
   };
   if (height) props.style = `height:${height}px`;

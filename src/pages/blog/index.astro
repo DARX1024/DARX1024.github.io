@@ -8,7 +8,6 @@ const byYear = Map.groupBy(posts, (p) => p.data.date?.getUTCFullYear() ?? '未�
 
 <Base title="博客" description="长文">
   <h1 class="page-title">博客</h1>
-  <p class="page-lede">较完整的长文。</p>
   {
     [...byYear].map(([year, list]) => (
       <section>

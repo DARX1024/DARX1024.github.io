@@ -22,6 +22,7 @@ const totalHours = Math.round(games.reduce((t, g) => t + (g.hours ?? 0), 0));
 const byLast = (a: Game, b: Game) => (b.last?.valueOf() ?? 0) - (a.last?.valueOf() ?? 0);
 const lead: Game | undefined = reviews[0];
 const spotlight = lead ?? [...all.filter((g) => g.recent)].sort(byLast)[0] ?? all.find((g) => g.status !== 'wishlist');
+const kicker = lead ? '最新评测' : spotlight?.recent ? '最近在玩' : '最近';
 const moreReviews = reviews.slice(1);
 const reviewMeta = (g: Game) =>
   [g.entry?.data.date && fmtDate(g.entry.data.date), g.status && STATUS_LABEL[g.status], fmtHours(g.hours)].filter(Boolean).join(' · ');
@@ -38,7 +39,7 @@ const shelves =
           items: all.filter((g) => g.status === 'finished').sort((a, b) => (b.finished?.valueOf() ?? 0) - (a.finished?.valueOf() ?? 0)),
         },
         { title: '私藏高分', items: all.filter((g) => (g.rating ?? 0) >= 8.5).sort((a, b) => b.rating! - a.rating!) },
-        { title: '玩得最久', items: [...all].sort((a, b) => (b.hours ?? 0) - (a.hours ?? 0)).slice(0, 14) },
+        { title: '玩得最久', items: [...all].sort((a, b) => (b.hours ?? 0) - (a.hours ?? 0)).slice(0, 14), top: true },
       ].filter((s) => s.items.length >= 2);
 
 // 详情卡的数据：点击海报时由脚本填进对话框
@@ -78,10 +79,10 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
             <p class="crumb">
               <a href="/life/">生活</a> / 游戏墙
             </p>
-            <p class="spot-kicker">{lead ? '最新评测' : spotlight.recent ? '最近在玩' : '最近'}</p>
+            <p class="spot-kicker">{kicker}</p>
             <h1 class="spot-title">{spotlight.title}</h1>
             <p class="spot-meta num">
-              {[spotlight.rating != null && `${spotlight.rating.toFixed(1)} / 10`, spotlight.status && STATUS_LABEL[spotlight.status], fmtHours(spotlight.hours) && `累计 ${fmtHours(spotlight.hours)}`, spotlight.ach && spotlight.ach[1] > 0 && `成就 ${spotlight.ach[0]}/${spotlight.ach[1]}`]
+              {[spotlight.rating != null && `${spotlight.rating.toFixed(1)} / 10`, spotlight.status && !(kicker === '最近在玩' && spotlight.status === 'playing') && STATUS_LABEL[spotlight.status], fmtHours(spotlight.hours), spotlight.ach && spotlight.ach[1] > 0 && `成就 ${spotlight.ach[0]}/${spotlight.ach[1]}`]
                 .filter(Boolean)
                 .join(' · ')}
               {spotlight.last && <span data-ago={spotlight.last.valueOf()} />}
@@ -129,7 +130,6 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
 
     <p class="stats num">
       {reviews.length > 0 && `${reviews.length} 篇评测 · `}{games.length} 款{count('finished') > 0 && ` · 通关 ${count('finished')}`}{totalHours > 0 && ` · 共 ${totalHours.toLocaleString('en-US')} 小时`}
-      {steamUpdatedAt && <span class="muted"> · Steam 数据同步于 {fmtDate(steamUpdatedAt)}</span>}
     </p>
 
     {
@@ -138,7 +138,7 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
           <header class="shelf-head">
             <h2>
               {s.title}
-              <span class="num">{s.items.length}</span>
+              {!('top' in s) && <span class="num">{s.items.length}</span>}
             </h2>
             <span class="shelf-nav">
               <button type="button" data-dir="-1" aria-label="向左">
@@ -196,9 +196,10 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
           </p>
         </section>
       ) : (
-        <p class="muted">还没有游戏。在 src/content/games/ 里建档，或者配置 Steam 同步（见 README）。</p>
+        <p class="muted">还没有内容。</p>
       )
     }
+    {steamUpdatedAt && <p class="source muted num">时长和成就来自 Steam，{fmtDate(steamUpdatedAt)} 更新</p>}
   </div>
 
   <!-- 详情卡：点击任意海报打开 -->
@@ -352,7 +353,7 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
   .spot-kicker {
     margin: 0 0 0.5rem;
     font-size: 0.75rem;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.06em;
     color: var(--accent);
   }
   .spot-title {
@@ -494,6 +495,10 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
     color: var(--muted);
   }
 
+  .source {
+    margin: 3.5rem 0 0;
+    font-size: 0.8125rem;
+  }
   .stats {
     margin: 1.5rem 0 0;
     font-size: 0.875rem;
@@ -759,7 +764,7 @@ const heroFail = "this.closest('[data-hero]').classList.add('no-hero')";
   .gd-kicker {
     margin: 0 0 0.35rem;
     font-size: 0.75rem;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.06em;
     color: var(--accent);
   }
   .gd h2 {
