@@ -312,6 +312,14 @@ main {
   color: var(--fg-soft);
   margin: 0 0 3rem;
 }
+/* 标题下面没有导语时，内容和标题之间留出同样的距离 */
+.page-title + .card-grid,
+.page-title + .viz-grid,
+.page-title + .section-label,
+.page-title + .year,
+.page-title + .muted {
+  margin-top: 2.5rem;
+}
 .section-label {
   font-size: 0.8125rem;
   font-weight: 500;

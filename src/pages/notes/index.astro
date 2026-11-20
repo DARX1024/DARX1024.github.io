@@ -10,12 +10,11 @@ const loose = (await getNotes())
 
 <Base title="笔记" description="课程与论文笔记">
   <h1 class="page-title">笔记</h1>
-  <p class="page-lede">课程与论文笔记。比博客更零散，会持续修改。</p>
 
   {
     series.length > 0 && (
       <>
-        <h2 class="section-label">系列</h2>
+        {loose.length > 0 && <h2 class="section-label">系列</h2>}
         <div class="card-grid">
           {series.map((s) => (
             <a class="card reveal" href={`/notes/${s.id}/`}>

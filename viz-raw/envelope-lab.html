@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>复指数的包络</title>
-<meta name="description" content="三个实验：阻尼正弦的包络为什么是复指数的模；离散复指数的包络；离散正弦上的虚线为什么不是包络。">
+<meta name="description" content="包络为什么就是复指数的模，离散正弦上的虚线又为什么不是包络。">
 <meta name="viz:date" content="2026-11-03">
 <meta name="viz:tags" content="信号与系统, 复指数">
 <meta name="viz:thumb" content="#a-c2">
@@ -59,6 +59,8 @@ canvas.wd{aspect-ratio:16/9}
 :root[data-lab] .wrap{gap:14px}
 :root[data-lab] .wrap{padding-block:4px}
 :root[data-embedded] .wrap{padding-inline:2px}
+/* 嵌入网站时外面的页面已经有同名标题，这里的不再重复 */
+:root[data-embedded] header>h1{display:none}
 @media (max-width:640px){.figs{grid-template-columns:minmax(0,1fr)}canvas.sq{margin:0 auto}}
 
 /* 嵌入网站时：网站会给 <html> 加 data-embedded，并传入 --site-* 配色，这里接上，让页面与正文融为一体 */
