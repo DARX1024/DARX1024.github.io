@@ -1,7 +1,7 @@
 ---
 // 半调点阵背景（halftone / LED dot-matrix）：
 // 一张缓慢流动的模糊渐变光斑，被规则网格采样成圆点，每个点的大小和透明度由该处的亮度决定。
-// 只画在页面顶部一条（首页高一些），向下淡出，不压在正文下面。
+// 固定在视口上（position: fixed），滚动时不动；正文那一栏只留很淡的一层，主要出现在页边。
 // 开关在 site.config.ts 的 BACKDROP；预览时也可以在网址后面加 ?halftone=off 临时关掉。
 import { BACKDROP } from '../site.config';
 
@@ -17,18 +17,20 @@ const { variant = 'page' } = Astro.props;
 
 <style>
   .halftone {
-    /* 正文所在的中间一栏只留淡淡一层（--ht-inner），点阵主要出现在两侧页边；再整体向下淡出 */
+    /* 正文所在的中间一栏只留淡淡一层（--ht-inner），点阵主要出现在两侧页边；视口下部稍微收一点 */
     --clear: calc(var(--wide) / 2 + var(--gutter));
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
+    height: 100vh;
+    height: 100lvh; /* 手机地址栏伸缩时不跟着变高，避免点阵跳动 */
     z-index: -1;
     pointer-events: none;
     overflow: hidden;
     opacity: 0;
     transition: opacity 1.2s ease;
-    --fade: linear-gradient(to bottom, rgb(0 0 0 / 0.4) 0, #000 6rem, #000 35%, transparent 100%);
+    --fade: linear-gradient(to bottom, #000 0, #000 55%, rgb(0 0 0 / 0.55) 100%);
     --sides: linear-gradient(
       to right,
       #000 0,
@@ -43,13 +45,9 @@ const { variant = 'page' } = Astro.props;
     -webkit-mask-composite: source-in;
     mask-composite: intersect;
   }
-  .halftone[data-variant='home'] {
-    height: min(100svh, 860px);
-  }
   .halftone[data-variant='page'] {
     --clear: calc(var(--measure) / 2 + var(--gutter));
-    --fade: linear-gradient(to bottom, rgb(0 0 0 / 0.4) 0, #000 6rem, #000 25%, transparent 100%);
-    /* 文章页左侧页边是目录，所以点阵只放在右上角 */
+    /* 文章页左侧页边是目录，所以点阵只放在右侧 */
     --sides: linear-gradient(
       to right,
       rgb(0 0 0 / var(--ht-inner)) 0,
@@ -57,13 +55,6 @@ const { variant = 'page' } = Astro.props;
       #000 calc(50% + var(--clear) + 8rem),
       #000 100%
     );
-    height: 520px;
-  }
-  /* 页面顶部还没滚动时，页头透明，让点阵从窗口最上沿开始，不被页头切出一条硬边 */
-  :global(.halftone ~ .site-header:not(.scrolled)) {
-    background: transparent;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
   .halftone.ready {
     opacity: 1;

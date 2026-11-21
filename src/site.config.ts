@@ -12,7 +12,7 @@ export const SITE = {
 
 // 背景
 export const BACKDROP = {
-  // 半调点阵背景（halftone）：'home' 只在首页顶部；'all' 首页顶部 + 其他页面顶部一条浅的；'off' 关闭
+  // 半调点阵背景（halftone）：'home' 只在首页；'all' 所有页面（文章页只在右侧页边）；'off' 关闭。背景固定在视口上，不随滚动移动
   // 预览时也可以在网址后面加 ?halftone=off 临时关掉，?halftone=static 停止流动
   halftone: 'all' as 'off' | 'home' | 'all',
   // 是否缓慢流动（系统开了「减少动态效果」时总是静止）

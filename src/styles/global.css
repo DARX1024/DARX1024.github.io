@@ -37,7 +37,8 @@
   --accent-soft: rgba(47, 93, 138, 0.1);
   --mark: rgba(255, 214, 102, 0.45);
   --selection: rgba(47, 93, 138, 0.18);
-  --header-bg: rgba(252, 252, 250, 0.78);
+  --header-bg: rgba(252, 252, 250, 0.5);
+  --header-line: rgba(35, 34, 31, 0.07);
   --grain: none;
   /* 半调点阵背景（components/Halftone.astro）：三种光斑颜色、点阵格子大小（px）、首页/其他页的整体不透明度 */
   --ht-1: #2f5d8a;
@@ -63,7 +64,8 @@
   --accent-soft: rgba(217, 165, 91, 0.12);
   --mark: rgba(217, 165, 91, 0.25);
   --selection: rgba(217, 165, 91, 0.25);
-  --header-bg: rgba(23, 21, 19, 0.78);
+  --header-bg: rgba(23, 21, 19, 0.45);
+  --header-line: rgba(230, 220, 203, 0.07);
   /* 极淡的纸张颗粒，让暗底不那么「平」 */
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .88 0 0 0 0 .78 0 0 0 -1.6 1.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
 
@@ -193,16 +195,17 @@ img {
   transition: border-color 0.2s;
   view-transition-name: site-header;
 }
-/* 毛玻璃页头：滚动时正文从下面隐约透过 */
+/* 亚克力页头：半透明底色 + 模糊 + 颗粒，背景点阵和滚过的正文都从下面隐约透出。
+   滚动前后底色不变，只淡入一条很浅的分隔线，避免一滚动页头就「变实」 */
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .site-header {
     background: var(--grain), var(--header-bg);
-    -webkit-backdrop-filter: saturate(1.4) blur(14px);
-    backdrop-filter: saturate(1.4) blur(14px);
+    -webkit-backdrop-filter: saturate(1.5) blur(20px);
+    backdrop-filter: saturate(1.5) blur(20px);
   }
 }
 .site-header.scrolled {
-  border-bottom-color: var(--border);
+  border-bottom-color: var(--header-line);
 }
 .site-header .container {
   display: flex;
