@@ -10,6 +10,15 @@ export const SITE = {
   email: '', // 留空则不显示
 };
 
+// 背景
+export const BACKDROP = {
+  // 半调点阵背景（halftone）：'home' 只在首页顶部；'all' 首页顶部 + 其他页面顶部一条浅的；'off' 关闭
+  // 预览时也可以在网址后面加 ?halftone=off 临时关掉，?halftone=static 停止流动
+  halftone: 'all' as 'off' | 'home' | 'all',
+  // 是否缓慢流动（系统开了「减少动态效果」时总是静止）
+  animate: true,
+};
+
 export const NAV: { href: string; label: string; match?: string[] }[] = [
   { href: '/blog/', label: '博客' },
   { href: '/notes/', label: '笔记' },
