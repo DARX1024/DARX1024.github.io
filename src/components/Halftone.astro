@@ -1,0 +1,241 @@
+---
+// 半调点阵背景（halftone / LED dot-matrix）：
+// 一张缓慢流动的模糊渐变光斑，被规则网格采样成圆点，每个点的大小和透明度由该处的亮度决定。
+// 只画在页面顶部一条（首页高一些），向下淡出，不压在正文下面。
+// 开关在 site.config.ts 的 BACKDROP；预览时也可以在网址后面加 ?halftone=off 临时关掉。
+import { BACKDROP } from '../site.config';
+
+interface Props {
+  variant?: 'home' | 'page';
+}
+const { variant = 'page' } = Astro.props;
+---
+
+<div class="halftone" data-variant={variant} data-animate={BACKDROP.animate ? '' : undefined} aria-hidden="true">
+  <canvas></canvas>
+</div>
+
+<style>
+  .halftone {
+    /* 正文所在的中间一栏只留淡淡一层（--ht-inner），点阵主要出现在两侧页边；再整体向下淡出 */
+    --clear: calc(var(--wide) / 2 + var(--gutter));
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+    --fade: linear-gradient(to bottom, rgb(0 0 0 / 0.4) 0, #000 6rem, #000 35%, transparent 100%);
+    --sides: linear-gradient(
+      to right,
+      #000 0,
+      #000 calc(50% - var(--clear) - 8rem),
+      rgb(0 0 0 / var(--ht-inner)) calc(50% - var(--clear) + 2rem),
+      rgb(0 0 0 / var(--ht-inner)) calc(50% + var(--clear) - 2rem),
+      #000 calc(50% + var(--clear) + 8rem),
+      #000 100%
+    );
+    -webkit-mask-image: var(--fade), var(--sides);
+    mask-image: var(--fade), var(--sides);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  .halftone[data-variant='home'] {
+    height: min(100svh, 860px);
+  }
+  .halftone[data-variant='page'] {
+    --clear: calc(var(--measure) / 2 + var(--gutter));
+    --fade: linear-gradient(to bottom, rgb(0 0 0 / 0.4) 0, #000 6rem, #000 25%, transparent 100%);
+    /* 文章页左侧页边是目录，所以点阵只放在右上角 */
+    --sides: linear-gradient(
+      to right,
+      rgb(0 0 0 / var(--ht-inner)) 0,
+      rgb(0 0 0 / var(--ht-inner)) calc(50% + var(--clear) - 2rem),
+      #000 calc(50% + var(--clear) + 8rem),
+      #000 100%
+    );
+    height: 520px;
+  }
+  /* 页面顶部还没滚动时，页头透明，让点阵从窗口最上沿开始，不被页头切出一条硬边 */
+  :global(.halftone ~ .site-header:not(.scrolled)) {
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .halftone.ready {
+    opacity: 1;
+  }
+  .halftone canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  @media print {
+    .halftone {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  const VERT = `attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}`;
+  // 场：几个沿利萨如轨迹缓慢移动的高斯光斑 + 一条斜向光带（参考图里那种对角线渐变）
+  // 网格：每个格子只在格子中心采样一次场，所以点内颜色均匀，点与点之间是干净的背景
+  const FRAG = `
+precision highp float;
+uniform vec2 uRes;
+uniform float uTime, uCell, uAlpha;
+uniform vec3 uC1, uC2, uC3;
+
+float g(vec2 q, vec2 c, float r){ vec2 d=q-c; return exp(-dot(d,d)/(r*r)); }
+
+void main(){
+  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+  vec2 cell = floor(p / uCell);
+  vec2 ctr = (cell + .5) * uCell;
+  // 以高度为单位的坐标，横向按宽高比拉开
+  float a = uRes.x / uRes.y;
+  vec2 q = vec2(ctr.x / uRes.y, ctr.y / uRes.y);
+  float t = uTime;
+
+  // 斜向光带：从右上往左下，位置缓慢摆动
+  vec2 dir = normalize(vec2(1., .62));
+  float s = dot(q - vec2(a*.72 + .08*sin(t*.31), .05), dir) + .05*sin(q.y*2.3 + t*.4);
+  float band = exp(-s*s/.06) * .9;
+
+  float k1 = g(q, vec2(a*.82 + .10*sin(t*.23), .22 + .08*cos(t*.29)), .42) * 1.0;
+  float k2 = g(q, vec2(a*.62 + .14*cos(t*.17), .62 + .10*sin(t*.21)), .40) * .85;
+  float k3 = g(q, vec2(a*.97 + .06*sin(t*.37 + 1.), -.02 + .06*cos(t*.33)), .32) * 1.2;
+  // 左侧也放两团，和右侧的光带呼应
+  float k4 = g(q, vec2(a*.04 + .05*cos(t*.19), .30 + .08*sin(t*.27)), .42) * .9;
+  float k5 = g(q, vec2(a*.14 + .06*sin(t*.25 + 2.), .78 + .06*cos(t*.2)), .30) * .55;
+
+  float sum = band + k1 + k2 + k3 + k4 + k5 + 1e-4;
+  vec3 col = (band*uC3 + k1*uC1 + k2*uC2 + k3*uC3 + k4*uC2 + k5*uC1) / sum;
+  float I = 1. - exp(-sum*1.15);
+
+  // 点的半径和透明度都随亮度增长；几乎没有亮度的地方点直接消失
+  float r = uCell * .5 * mix(.12, .9, sqrt(I));
+  float aa = 1.;
+  float m = 1. - smoothstep(r - aa, r, length(p - ctr));
+  float alpha = uAlpha * m * smoothstep(.04, .75, I);
+  gl_FragColor = vec4(col * alpha, alpha);
+}`;
+
+  function init(wrap: HTMLElement) {
+    if (new URLSearchParams(location.search).get('halftone') === 'off') {
+      wrap.remove();
+      return;
+    }
+    const canvas = wrap.querySelector('canvas')!;
+    const gl = canvas.getContext('webgl', { premultipliedAlpha: true, antialias: false, alpha: true });
+    if (!gl) {
+      wrap.remove();
+      return;
+    }
+    const sh = (type: number, src: string) => {
+      const s = gl.createShader(type)!;
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      return s;
+    };
+    const prog = gl.createProgram()!;
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      wrap.remove();
+      return;
+    }
+    gl.useProgram(prog);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'a');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    const u = (n: string) => gl.getUniformLocation(prog, n);
+    const uRes = u('uRes'), uTime = u('uTime'), uCell = u('uCell'), uAlpha = u('uAlpha');
+    const uC = [u('uC1'), u('uC2'), u('uC3')];
+
+    // 颜色、透明度、格子大小都从 CSS 变量读，跟着亮/暗主题走（见 global.css 里的 --ht-*）
+    const hex = (h: string) => {
+      const m = h.trim().replace('#', '');
+      const n = parseInt(m.length === 3 ? m.replace(/./g, '$&$&') : m, 16);
+      return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+    };
+    let dpr = 1;
+    const readTheme = () => {
+      const cs = getComputedStyle(wrap);
+      ['--ht-1', '--ht-2', '--ht-3'].forEach((v, i) => gl.uniform3fv(uC[i], hex(cs.getPropertyValue(v) || '#888')));
+      const key = wrap.dataset.variant === 'home' ? '--ht-alpha-home' : '--ht-alpha-page';
+      gl.uniform1f(uAlpha, parseFloat(cs.getPropertyValue(key)) || 0.4);
+      gl.uniform1f(uCell, (parseFloat(cs.getPropertyValue('--ht-cell')) || 7) * dpr);
+    };
+    const resize = () => {
+      dpr = Math.min(2, devicePixelRatio || 1);
+      const w = Math.round(wrap.clientWidth * dpr), h = Math.round(wrap.clientHeight * dpr);
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      gl.viewport(0, 0, w, h);
+      gl.uniform2f(uRes, w, h);
+      readTheme();
+    };
+
+    const still = matchMedia('(prefers-reduced-motion: reduce)');
+    const animate = wrap.dataset.animate !== undefined && new URLSearchParams(location.search).get('halftone') !== 'static';
+    // 每次打开页面从一个随机相位开始，免得每页的图案一模一样
+    const t0 = performance.now() - Math.random() * 60000;
+    let visible = true, raf = 0, last = 0;
+    const draw = (now: number) => {
+      gl.uniform1f(uTime, (now - t0) / 1000 * 0.35);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    };
+    const loop = (now: number) => {
+      raf = 0;
+      if (!visible || document.hidden) return;
+      // 动得很慢，30fps 足够，省电
+      if (now - last > 33) {
+        last = now;
+        draw(now);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    const kick = () => {
+      if (!animate || still.matches) {
+        draw(t0 + 20000);
+        return;
+      }
+      if (!raf && visible && !document.hidden) raf = requestAnimationFrame(loop);
+    };
+
+    resize();
+    draw(performance.now());
+    wrap.classList.add('ready');
+    kick();
+
+    new ResizeObserver(() => {
+      resize();
+      draw(performance.now());
+    }).observe(wrap);
+    new IntersectionObserver(([e]) => {
+      visible = e.isIntersecting;
+      kick();
+    }).observe(wrap);
+    document.addEventListener('visibilitychange', kick);
+    still.addEventListener?.('change', kick);
+    new MutationObserver(() => {
+      readTheme();
+      draw(performance.now());
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
+  document.querySelectorAll<HTMLElement>('.halftone').forEach(init);
+</script>

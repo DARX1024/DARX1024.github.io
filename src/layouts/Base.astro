@@ -4,7 +4,8 @@ import '@fontsource/newsreader/latin-600.css';
 // 标题中文宋体的后备：只有系统里没有宋体的设备才会下载，而且只下载标题用到的字所在的分片（见 global.css）
 import '@fontsource/noto-serif-sc/600.css';
 import '../styles/global.css';
-import { SITE, NAV } from '../site.config';
+import { SITE, NAV, BACKDROP } from '../site.config';
+import Halftone from '../components/Halftone.astro';
 import { getPosts } from '../lib/content';
 import { hasLife } from '../lib/games';
 
@@ -21,6 +22,8 @@ const canonical = new URL(path, Astro.site);
 const hasPosts = (await getPosts()).length > 0;
 const lifeReady = await hasLife();
 const nav = NAV.filter((n) => (n.href !== '/blog/' || hasPosts) && (n.href !== '/life/' || lifeReady));
+const isHome = path === '/' || path === '/index.html';
+const showHalftone = BACKDROP.halftone === 'all' || (BACKDROP.halftone === 'home' && isHome);
 const isCurrent = (n: (typeof NAV)[number]) => [n.href, ...(n.match ?? [])].some((p) => path.startsWith(p));
 ---
 
@@ -50,6 +53,7 @@ const isCurrent = (n: (typeof NAV)[number]) => [n.href, ...(n.match ?? [])].some
     <slot name="head" />
   </head>
   <body>
+    {showHalftone && <Halftone variant={isHome ? 'home' : 'page'} />}
     <div class="read-progress" aria-hidden="true"></div>
     <header class="site-header">
       <div class="container wide">
