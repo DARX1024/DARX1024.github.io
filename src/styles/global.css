@@ -67,11 +67,11 @@
   /* 极淡的纸张颗粒，让暗底不那么「平」 */
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .88 0 0 0 0 .78 0 0 0 -1.6 1.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
 
-  --ht-1: #d9a55b;
+  --ht-1: #b0844d;
   --ht-2: #4f6f8f;
-  --ht-3: #efe0c4;
-  --ht-alpha-home: 0.85;
-  --ht-alpha-page: 0.55;
+  --ht-3: #c4b496;
+  --ht-alpha-home: 0.72;
+  --ht-alpha-page: 0.48;
   --ht-inner: 0.2;
 
   color-scheme: dark;

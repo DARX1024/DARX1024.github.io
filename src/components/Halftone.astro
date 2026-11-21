@@ -189,8 +189,9 @@ void main(){
 
     const still = matchMedia('(prefers-reduced-motion: reduce)');
     const animate = wrap.dataset.animate !== undefined && new URLSearchParams(location.search).get('halftone') !== 'static';
-    // 每次打开页面从一个随机相位开始，免得每页的图案一模一样
-    const t0 = performance.now() - Math.random() * 60000;
+    // 流动时每次打开页面从一个随机相位开始，免得每页的图案一模一样；静止时固定一帧
+    const t0 = performance.now() - (animate ? Math.random() * 60000 : 0);
+    const moving = () => animate && !still.matches;
     let visible = true, raf = 0, last = 0;
     const draw = (now: number) => {
       gl.uniform1f(uTime, (now - t0) / 1000 * 0.35);
@@ -209,21 +210,22 @@ void main(){
       raf = requestAnimationFrame(loop);
     };
     const kick = () => {
-      if (!animate || still.matches) {
+      if (!moving()) {
         draw(t0 + 20000);
         return;
       }
       if (!raf && visible && !document.hidden) raf = requestAnimationFrame(loop);
     };
 
+    const redraw = () => draw(moving() ? performance.now() : t0 + 20000);
     resize();
-    draw(performance.now());
+    redraw();
     wrap.classList.add('ready');
     kick();
 
     new ResizeObserver(() => {
       resize();
-      draw(performance.now());
+      redraw();
     }).observe(wrap);
     new IntersectionObserver(([e]) => {
       visible = e.isIntersecting;
@@ -233,7 +235,7 @@ void main(){
     still.addEventListener?.('change', kick);
     new MutationObserver(() => {
       readTheme();
-      draw(performance.now());
+      redraw();
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   }
 
