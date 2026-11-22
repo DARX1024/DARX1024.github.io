@@ -164,6 +164,12 @@ const thumb = (up: boolean) =>
     scrollbar-width: none;
     outline: none;
   }
+  .rw-track {
+    transition: opacity 0.22s ease;
+  }
+  .rw-track.jump {
+    opacity: 0;
+  }
   .rw-track::-webkit-scrollbar {
     display: none;
   }
@@ -513,12 +519,44 @@ const thumb = (up: boolean) =>
       return best;
     };
 
+    // 程序触发的滚动（点箭头、进度条、自动轮播）进行中时，target 是要去的那张。
+    // 滚动途中会经过别的卡片，这时不能按滚动位置去改「当前」，否则进度条和高亮会来回跳
+    let target = -1;
+    let settle: number | undefined;
+    let fade: number | undefined;
+    const sync = () => {
+      const k = nearest();
+      if (k !== current) {
+        setActive(k);
+        restart();
+      }
+    };
     const go = (i: number) => {
       const n = (i + cards.length) % cards.length;
+      if (n === current && target < 0) return restart();
       const pad = parseFloat(getComputedStyle(track).scrollPaddingInlineStart) || 0;
-      track.scrollTo({ left: cards[n].offsetLeft - pad, behavior: reduce.matches ? 'auto' : 'smooth' });
+      const left = cards[n].offsetLeft - pad;
+      // 一次跨好几张（包括从最后一张回到第一张）：不从中间一张张划过去，淡出、跳过去、再淡入
+      const far = Math.abs(n - current) > 1;
+      clearTimeout(fade);
+      track.classList.remove('jump');
+      if (reduce.matches) track.scrollTo({ left, behavior: 'auto' });
+      else if (far) {
+        track.classList.add('jump');
+        fade = window.setTimeout(() => {
+          track.scrollTo({ left, behavior: 'auto' });
+          track.classList.remove('jump');
+        }, 220);
+      } else track.scrollTo({ left, behavior: 'smooth' });
+      target = n;
       setActive(n);
       restart();
+      // 兜底：浏览器不支持 scrollend，或者滚动被用户打断
+      clearTimeout(settle);
+      settle = window.setTimeout(() => {
+        target = -1;
+        sync();
+      }, 1500);
     };
 
     let raf = 0;
@@ -526,10 +564,22 @@ const thumb = (up: boolean) =>
       'scroll',
       () => {
         cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(() => setActive(nearest()));
+        raf = requestAnimationFrame(() => {
+          if (target >= 0) {
+            if (nearest() === target) target = -1;
+            return;
+          }
+          // 用户自己拖动 / 滑动：跟着换当前卡片，自动轮播重新计时
+          sync();
+        });
       },
       { passive: true },
     );
+    track.addEventListener('scrollend', () => {
+      if (target >= 0 && nearest() !== target) return;
+      target = -1;
+      sync();
+    });
 
     root.querySelectorAll<HTMLButtonElement>('.rw-nav button').forEach((b) =>
       b.addEventListener('click', () => go(current + Number(b.dataset.dir))),
