@@ -1,7 +1,8 @@
 ---
 // 评测墙：生活页上的一排 Steam 评测，横向滚动，参考 Steam 商店首页的「精选和推荐」轮播。
 // 一次一张宽卡片：左边是游戏横幅大图，右边是推荐与否、摘句和出处；两侧露出相邻的卡片。
-// 自动轮播（悬停、键盘聚焦、滚出屏幕、切到别的标签页时暂停；系统开了「减少动态效果」时不自动播），
+// 自动轮播（悬停、手指按住、键盘聚焦、滚出屏幕、切到别的标签页时暂停，恢复后接着剩下的时间走；
+// 系统开了「减少动态效果」时不自动播），
 // 也可以拖动 / 滑动、点箭头或下方的进度条切换。数据见 lib/games.ts 的 getReviewWall()。
 import { fmtDate } from '../lib/content';
 import { fmtHours, type WallReview } from '../lib/games';
@@ -602,26 +603,42 @@ const thumb = (up: boolean) =>
     });
 
     // ---------- 自动轮播 ----------
+    // 暂停（悬停、聚焦、滚出屏幕、切标签页）时记住这一张还剩多少时间，恢复后接着走，
+    // 和进度条一致：进度条的 CSS 动画暂停后也是从原处继续
     const hold = new Set<string>();
+    let remaining = interval;
+    let startedAt = 0;
+    const stopClock = () => {
+      if (timer === undefined) return;
+      clearTimeout(timer);
+      timer = undefined;
+      remaining = Math.max(0, remaining - (performance.now() - startedAt));
+    };
+    const runClock = () => {
+      if (!root.classList.contains('autoplay') || hold.size || timer !== undefined) return;
+      startedAt = performance.now();
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        go(current + 1);
+      }, remaining);
+    };
     const pause = (why: string) => {
       hold.add(why);
       root.classList.add('paused');
-      clearTimeout(timer);
-      timer = undefined;
+      stopClock();
     };
     const resume = (why: string) => {
-      hold.delete(why);
-      if (hold.size) return;
+      if (!hold.delete(why) || hold.size) return;
       root.classList.remove('paused');
-      restart();
+      runClock();
     };
-    // 进度条动画和定时器一起从头开始
+    // 换了一张：定时器和进度条都从头开始（暂停中也一样，恢复后从头走）
     function restart() {
       clearTimeout(timer);
       timer = undefined;
-      if (!root.classList.contains('autoplay') || hold.size) return;
+      remaining = interval;
       resetBar();
-      timer = window.setTimeout(() => go(current + 1), interval);
+      runClock();
     }
     const autoplay = () => {
       const on = !reduce.matches && cards.length > 1;
@@ -632,10 +649,14 @@ const thumb = (up: boolean) =>
 
     root.addEventListener('pointerenter', (e) => e.pointerType === 'mouse' && pause('hover'));
     root.addEventListener('pointerleave', () => resume('hover'));
-    root.addEventListener('focusin', () => pause('focus'));
+    // 只有键盘聚焦才暂停：鼠标点箭头、手指点卡片也会让元素获得焦点，
+    // 不区分的话点一下箭头之后就再也不自动播了
+    root.addEventListener('focusin', (e) => (e.target as Element).matches(':focus-visible') && pause('focus'));
     root.addEventListener('focusout', (e) => !root.contains(e.relatedTarget as Node) && resume('focus'));
-    // 手指拖动过就不再自动播：用户已经在自己翻了
+    // 手指按住时暂停；松手后接着播（如果滑到了别的卡片，会从那一张重新计时）
     track.addEventListener('touchstart', () => pause('touch'), { passive: true });
+    track.addEventListener('touchend', () => resume('touch'), { passive: true });
+    track.addEventListener('touchcancel', () => resume('touch'), { passive: true });
     document.addEventListener('visibilitychange', () => (document.hidden ? pause('hidden') : resume('hidden')));
     new IntersectionObserver(([e]) => (e.isIntersecting ? resume('offscreen') : pause('offscreen')), { threshold: 0.35 }).observe(root);
     reduce.addEventListener('change', autoplay);
