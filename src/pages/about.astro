@@ -11,8 +11,8 @@ const { Content } = await render(page);
 ---
 
 <Base title={page.data.title} description={page.data.description}>
-  <h1 class="page-title">{page.data.title}</h1>
-  <div class="prose" style="margin-top: 2rem">
+  <h1 class="page-title sr-only">{page.data.title}</h1>
+  <div class="prose">
     <Content />
   </div>
 </Base>

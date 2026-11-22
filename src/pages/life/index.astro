@@ -12,51 +12,55 @@ const shelf = games.filter((g) => g.status !== 'wishlist').slice(0, 6);
 ---
 
 <Base title="生活" description="随笔、游戏和评测" wide>
-  <h1 class="page-title">生活</h1>
+  <h1 class="page-title sr-only">生活</h1>
 
-  <div class="cols">
-    {
-      essays.length > 0 && (
-        <section class="block">
-          <h2 class="block-label"><span>随笔</span></h2>
-          {[...byYear].map(([year, list]) => (
-            <>
-              <h3 class="year">{year}</h3>
+  {
+    (essays.length > 0 || reviews.length > 0) && (
+      <div class="cols">
+        {
+          essays.length > 0 && (
+            <section class="block">
+              <h2 class="block-label"><span>随笔</span></h2>
+              {[...byYear].map(([year, list]) => (
+                <>
+                  <h3 class="year">{year}</h3>
+                  <ul class="entry-list">
+                    {list.map((p) => (
+                      <li>
+                        <time datetime={p.data.date?.toISOString()}>{fmtDate(p.data.date).slice(5)}</time>
+                        <a href={`/life/${p.id}/`} style={vtStyle('life', p.id)}>{titleOf(p)}</a>
+                        {p.data.description && <span class="desc">{p.data.description}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ))}
+            </section>
+          )
+        }
+
+        {
+          reviews.length > 0 && (
+            <section class="block">
+              <h2 class="block-label"><span>游戏评测</span></h2>
               <ul class="entry-list">
-                {list.map((p) => (
+                {reviews.map((g) => (
                   <li>
-                    <time datetime={p.data.date?.toISOString()}>{fmtDate(p.data.date).slice(5)}</time>
-                    <a href={`/life/${p.id}/`} style={vtStyle('life', p.id)}>{titleOf(p)}</a>
-                    {p.data.description && <span class="desc">{p.data.description}</span>}
+                    <time datetime={g.entry!.data.date?.toISOString()}>{fmtDate(g.entry!.data.date)}</time>
+                    <a href={g.href} style={vtStyle('game', g.entry!.id)}>
+                      {g.title}
+                      {g.rating != null && <span class="score num">{g.rating.toFixed(1)}</span>}
+                    </a>
+                    {g.description && <span class="desc">{g.description}</span>}
                   </li>
                 ))}
               </ul>
-            </>
-          ))}
-        </section>
-      )
-    }
-
-    {
-      reviews.length > 0 && (
-        <section class="block">
-          <h2 class="block-label"><span>游戏评测</span></h2>
-          <ul class="entry-list">
-            {reviews.map((g) => (
-              <li>
-                <time datetime={g.entry!.data.date?.toISOString()}>{fmtDate(g.entry!.data.date)}</time>
-                <a href={g.href} style={vtStyle('game', g.entry!.id)}>
-                  {g.title}
-                  {g.rating != null && <span class="score num">{g.rating.toFixed(1)}</span>}
-                </a>
-                {g.description && <span class="desc">{g.description}</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )
-    }
-  </div>
+            </section>
+          )
+        }
+      </div>
+    )
+  }
 
   <ReviewWall reviews={wall} />
 
@@ -130,6 +134,15 @@ const shelf = games.filter((g) => g.status !== 'wishlist').slice(0, 6);
   }
   .cols .year:first-of-type {
     margin-top: 0;
+  }
+  /* 页面标题只留给读屏，第一行区块直接贴着页面顶部的留白 */
+  .cols > .block:first-child {
+    margin-top: 0;
+  }
+  @media (min-width: 56rem) {
+    .cols:has(> section + section) > .block {
+      margin-top: 0;
+    }
   }
   .score {
     margin-left: 0.6em;
