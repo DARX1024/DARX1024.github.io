@@ -7,7 +7,7 @@ const viz = (await getCollection('viz')).sort((a, b) => (b.data.date?.valueOf() 
 ---
 
 <Base title="交互可视化" description="交互可视化" wide>
-  <h1 class="page-title">交互可视化</h1>
+  <h1 class="page-title sr-only">交互可视化</h1>
   <div class="viz-grid">
     {viz.map((v) => <VizCard v={v} meta vt />)}
   </div>
