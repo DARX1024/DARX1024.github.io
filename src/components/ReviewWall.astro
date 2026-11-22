@@ -1,0 +1,597 @@
+---
+// 评测墙：生活页上的一排 Steam 评测，横向滚动，参考 Steam 商店首页的「精选和推荐」轮播。
+// 一次一张宽卡片：左边是游戏横幅大图，右边是推荐与否、摘句和出处；两侧露出相邻的卡片。
+// 自动轮播（悬停、键盘聚焦、滚出屏幕、切到别的标签页时暂停；系统开了「减少动态效果」时不自动播），
+// 也可以拖动 / 滑动、点箭头或下方的进度条切换。数据见 lib/games.ts 的 getReviewWall()。
+import { fmtDate } from '../lib/content';
+import { fmtHours, type WallReview } from '../lib/games';
+
+interface Props {
+  reviews: WallReview[];
+}
+const { reviews } = Astro.props;
+// 横幅大图加载失败 → 换横版头图 → 再失败就用竖版封面模糊成一片颜色
+const onerror =
+  "var f=this.dataset.fallback;if(f){this.removeAttribute('data-fallback');this.src=f}else{this.closest('.rw-card').classList.add('no-img')}";
+const thumb = (up: boolean) =>
+  up
+    ? 'M5 7.2V14H2.8A.8.8 0 0 1 2 13.2V8a.8.8 0 0 1 .8-.8zm1.2 6.6V7l2.5-4.6a1.3 1.3 0 0 1 2.4.9L10.5 6.4h2.9a1.5 1.5 0 0 1 1.5 1.8l-1 4.8a1.5 1.5 0 0 1-1.5 1.2z'
+    : 'M5 8.8V2H2.8a.8.8 0 0 0-.8.8V8a.8.8 0 0 0 .8.8zm1.2-6.6V9l2.5 4.6a1.3 1.3 0 0 0 2.4-.9L10.5 9.6h2.9a1.5 1.5 0 0 0 1.5-1.8l-1-4.8A1.5 1.5 0 0 0 12.4 2z';
+---
+
+{
+  reviews.length > 0 && (
+    <section class="rw" aria-roledescription="carousel" aria-label="评测墙">
+      <h2 class="rw-label">
+        <span>评测墙</span>
+        <span class="rw-nav">
+          <button type="button" data-dir="-1" aria-label="上一篇">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M10 3L5 8l5 5" /></svg>
+          </button>
+          <button type="button" data-dir="1" aria-label="下一篇">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 3l5 5-5 5" /></svg>
+          </button>
+        </span>
+      </h2>
+
+      <div class="rw-track" tabindex="0" aria-label="评测，可左右滚动">
+        {reviews.map((r, i) => (
+          <article
+            class:list={['rw-card', { down: !r.up }]}
+            aria-roledescription="slide"
+            aria-label={`${i + 1} / ${reviews.length}：${r.title}`}
+            style={r.cover ? `--cover:url("${r.cover}")` : undefined}
+          >
+            <a class="rw-media" href={r.url} target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+              <img
+                src={r.hero}
+                data-fallback={r.header}
+                alt=""
+                loading={i < 2 ? 'eager' : 'lazy'}
+                decoding="async"
+                referrerpolicy="no-referrer"
+                onerror={onerror}
+              />
+              <span class="rw-title">{r.title}</span>
+            </a>
+            <div class="rw-body">
+              <p class="rw-verdict">
+                <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><path d={thumb(r.up)} /></svg>
+                <span>{r.up ? '推荐' : '不推荐'}</span>
+                {r.memo && <span class="rw-memo">{r.memo}</span>}
+                {r.hours != null && <span class="rw-hours num">{fmtHours(r.hours)}</span>}
+              </p>
+              <h3 class:list={['rw-head', { 'sr-only': !r.headline }]}>{r.headline ?? r.title}</h3>
+              <blockquote class="rw-quote">
+                <p>{r.quote}</p>
+              </blockquote>
+              <p class="rw-foot num">
+                <span>
+                  {[r.posted && fmtDate(r.posted), r.helpful && `${r.helpful} 人觉得有用`].filter(Boolean).join(' · ')}
+                </span>
+                <a href={r.url} target="_blank" rel="noopener">
+                  {r.more ? '读全文' : 'Steam 原文'}
+                  <span aria-hidden="true">↗</span>
+                </a>
+              </p>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {reviews.length > 1 && (
+        <div class="rw-dots" role="group" aria-label="选择评测">
+          {reviews.map((r, i) => (
+            <button type="button" data-i={i} aria-label={r.title} aria-current={i === 0 ? 'true' : undefined}>
+              <span />
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+<style>
+  :global(body:has(.rw)) {
+    overflow-x: clip;
+  }
+  .rw {
+    --bleed: max(var(--gutter), calc((100vw - var(--wide)) / 2));
+    --card-w: min(var(--wide), calc(100vw - 2 * var(--gutter)));
+    --interval: 8s;
+    margin-top: 3rem;
+  }
+
+  /* 和生活页其他分区一样的小标题，右侧多两个箭头 */
+  .rw-label {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .rw-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    order: 1;
+  }
+  .rw-nav {
+    order: 2;
+    display: flex;
+    gap: 0.4rem;
+  }
+  .rw-nav button {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .rw-nav button:hover {
+    color: var(--fg);
+    border-color: var(--muted);
+  }
+  @media (hover: none) {
+    .rw-nav {
+      display: none;
+    }
+  }
+
+  /* ---------- 轨道：伸到屏幕两侧，当前卡片和正文对齐，相邻的从两边露出来 ---------- */
+  .rw-track {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: var(--card-w);
+    gap: 1.25rem;
+    margin-inline: calc(50% - 50vw);
+    padding: 0.25rem var(--bleed) 1.5rem;
+    scroll-padding-inline: var(--bleed);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    outline: none;
+  }
+  .rw-track::-webkit-scrollbar {
+    display: none;
+  }
+  .rw-track:focus-visible .rw-card.on {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  /* ---------- 卡片 ---------- */
+  .rw-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+    min-height: 19.5rem;
+    border-radius: 10px;
+    overflow: hidden;
+    scroll-snap-align: start;
+    background: var(--bg-soft);
+    isolation: isolate;
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--fg) 7%, transparent),
+      0 18px 40px -22px rgba(0, 0, 0, 0.55);
+    /* 不是当前这张时退后一点、变暗，像 Steam 首页轮播两侧的预览 */
+    opacity: 0.42;
+    transform: scale(0.965);
+    transition:
+      opacity 0.5s ease,
+      transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .rw-card.on {
+    opacity: 1;
+    transform: none;
+  }
+  /* 没有脚本时全部正常显示 */
+  .rw:not(.ready) .rw-card {
+    opacity: 1;
+    transform: none;
+  }
+  .rw-card:not(.on) {
+    cursor: pointer;
+  }
+  /* 右侧面板的底色：封面模糊成一片，压在背景色下面，每张卡片有自己的色调 */
+  .rw-card::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: -20%;
+    background: var(--cover, none) center / cover;
+    filter: blur(60px) saturate(1.4);
+    opacity: 0.32;
+  }
+  :global(:root[data-theme='dark']) .rw-card::before {
+    opacity: 0.24;
+  }
+
+  .rw-media {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    background: var(--cover, var(--bg)) center / cover;
+  }
+  .rw-media img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 35%;
+    transition: transform 1.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  :global(:root[data-theme='dark']) .rw-media img {
+    filter: brightness(0.86) saturate(0.95);
+  }
+  .rw-card.on:hover .rw-media img {
+    transform: scale(1.035);
+  }
+  .rw-card.no-img .rw-media img {
+    display: none;
+  }
+  .rw-card.no-img .rw-media {
+    filter: blur(30px) saturate(1.3);
+    transform: scale(1.3);
+  }
+  /* 大图底部渐暗，标题压在上面；右侧渐变接到面板，接缝不生硬 */
+  .rw-media::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(to top, rgba(10, 8, 6, 0.72) 0%, rgba(10, 8, 6, 0.25) 32%, transparent 55%),
+      linear-gradient(to left, color-mix(in srgb, var(--bg-soft) 55%, transparent) 0%, transparent 14%);
+  }
+  .rw-title {
+    position: absolute;
+    z-index: 1;
+    left: 1.5rem;
+    right: 1.5rem;
+    bottom: 1.2rem;
+    font-family: var(--font-heading);
+    font-size: clamp(1.35rem, 2.6vw, 1.9rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: #f6f0e6;
+    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45);
+    text-wrap: balance;
+  }
+
+  .rw-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1.5rem 1.6rem 1.25rem;
+    min-width: 0;
+    background: color-mix(in srgb, var(--bg-soft) 72%, transparent);
+  }
+  .rw-verdict {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--accent);
+  }
+  .rw-verdict svg,
+  .rw-verdict > span:not(.rw-memo) {
+    flex: none;
+    white-space: nowrap;
+  }
+  .rw-memo {
+    padding: 0.05rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: var(--fg-soft);
+    background: color-mix(in srgb, var(--fg) 7%, transparent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .rw-hours {
+    margin-left: auto;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .rw-card.down .rw-verdict {
+    color: var(--muted);
+  }
+  /* 评测自己的标题（宋体）。没有标题时只给读屏用，游戏名已经在大图上 */
+  .rw-head {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 1.375rem;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+  }
+  .rw-head.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .rw-quote {
+    position: relative;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    flex: 1;
+  }
+  .rw-quote p {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    line-height: 1.85;
+    color: var(--fg-soft);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    overflow: hidden;
+  }
+  .rw-quote p::before {
+    content: '「';
+    margin-left: -0.45em;
+    color: var(--accent);
+  }
+  .rw-quote p::after {
+    content: '」';
+    color: var(--accent);
+  }
+  .rw-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.3rem 1rem;
+    margin: 0;
+    padding-top: 0.8rem;
+    border-top: 1px solid color-mix(in srgb, var(--fg) 9%, transparent);
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+  .rw-foot a {
+    color: var(--fg-soft);
+    text-decoration: none;
+  }
+  .rw-foot a:hover {
+    color: var(--accent);
+  }
+
+  /* ---------- 进度条：Steam 首页轮播下面那排小横条；当前这条随自动播放填满 ---------- */
+  .rw-dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.35rem;
+  }
+  .rw-dots button {
+    padding: 0.6rem 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .rw-dots span {
+    position: relative;
+    display: block;
+    width: 1.5rem;
+    height: 3px;
+    border-radius: 2px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--fg) 16%, transparent);
+    transition: width 0.35s ease, background 0.2s;
+  }
+  .rw-dots button:hover span {
+    background: color-mix(in srgb, var(--fg) 32%, transparent);
+  }
+  .rw-dots [aria-current='true'] span {
+    width: 2.75rem;
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .rw-dots [aria-current='true'] span::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    transform-origin: left;
+  }
+  .rw.autoplay .rw-dots [aria-current='true'] span::after {
+    animation: rw-fill var(--interval) linear both;
+  }
+  .rw.paused .rw-dots [aria-current='true'] span::after {
+    animation-play-state: paused;
+  }
+  @keyframes rw-fill {
+    from {
+      transform: scaleX(0);
+    }
+  }
+
+  /* ---------- 窄屏：图在上、文字在下，下一张从右边露一截 ---------- */
+  @media (max-width: 44rem) {
+    .rw {
+      --card-w: calc(100vw - 2 * var(--gutter) - 1.75rem);
+    }
+    .rw-track {
+      gap: 0.85rem;
+    }
+    .rw-card {
+      grid-template-columns: none;
+      grid-template-rows: auto 1fr;
+      min-height: 0;
+      opacity: 0.6;
+      transform: none;
+    }
+    .rw-media {
+      aspect-ratio: 16 / 7;
+    }
+    .rw-media::after {
+      background: linear-gradient(to top, rgba(10, 8, 6, 0.65) 0%, transparent 60%);
+    }
+    .rw-title {
+      left: 1rem;
+      right: 1rem;
+      bottom: 0.75rem;
+      font-size: 1.25rem;
+    }
+    .rw-body {
+      padding: 1rem 1.1rem 0.9rem;
+      gap: 0.7rem;
+    }
+    .rw-quote p {
+      font-size: 1rem;
+      -webkit-line-clamp: 5;
+      line-clamp: 5;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rw-card,
+    .rw-media img,
+    .rw-dots span {
+      transition: none;
+    }
+    .rw-card.on:hover .rw-media img {
+      transform: none;
+    }
+  }
+</style>
+
+<script>
+  for (const root of document.querySelectorAll<HTMLElement>('.rw')) {
+    const track = root.querySelector<HTMLElement>('.rw-track')!;
+    const cards = [...track.querySelectorAll<HTMLElement>('.rw-card')];
+    const dots = [...root.querySelectorAll<HTMLButtonElement>('.rw-dots button')];
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+    const interval = 8000;
+    let current = 0;
+    let timer: number | undefined;
+
+    const setActive = (i: number) => {
+      if (i === current && cards[i].classList.contains('on')) return;
+      current = i;
+      cards.forEach((c, k) => c.classList.toggle('on', k === i));
+      dots.forEach((d, k) => (k === i ? d.setAttribute('aria-current', 'true') : d.removeAttribute('aria-current')));
+      resetBar();
+    };
+    // 当前这条进度条的动画从头开始（和定时器保持同步）
+    const resetBar = () => {
+      const bar = dots[current]?.querySelector('span');
+      if (bar) {
+        bar.style.animation = 'none';
+        void bar.offsetWidth;
+        bar.style.animation = '';
+      }
+    };
+
+    // 卡片的左边缘对齐到 scroll-padding，所以「当前」就是左边缘离轨道起点最近的那张
+    const nearest = () => {
+      const pad = parseFloat(getComputedStyle(track).scrollPaddingInlineStart) || 0;
+      const x = track.scrollLeft + pad;
+      let best = 0;
+      cards.forEach((c, k) => {
+        if (Math.abs(c.offsetLeft - x) < Math.abs(cards[best].offsetLeft - x)) best = k;
+      });
+      return best;
+    };
+
+    const go = (i: number) => {
+      const n = (i + cards.length) % cards.length;
+      const pad = parseFloat(getComputedStyle(track).scrollPaddingInlineStart) || 0;
+      track.scrollTo({ left: cards[n].offsetLeft - pad, behavior: reduce.matches ? 'auto' : 'smooth' });
+      setActive(n);
+      restart();
+    };
+
+    let raf = 0;
+    track.addEventListener(
+      'scroll',
+      () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => setActive(nearest()));
+      },
+      { passive: true },
+    );
+
+    root.querySelectorAll<HTMLButtonElement>('.rw-nav button').forEach((b) =>
+      b.addEventListener('click', () => go(current + Number(b.dataset.dir))),
+    );
+    dots.forEach((d) => d.addEventListener('click', () => go(Number(d.dataset.i))));
+    // 点两侧露出来的卡片：先切过去，而不是直接打开链接
+    cards.forEach((c, k) =>
+      c.addEventListener('click', (e) => {
+        if (k !== current) {
+          e.preventDefault();
+          go(k);
+        }
+      }),
+    );
+    track.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        go(current + (e.key === 'ArrowRight' ? 1 : -1));
+      }
+    });
+
+    // ---------- 自动轮播 ----------
+    const hold = new Set<string>();
+    const pause = (why: string) => {
+      hold.add(why);
+      root.classList.add('paused');
+      clearTimeout(timer);
+      timer = undefined;
+    };
+    const resume = (why: string) => {
+      hold.delete(why);
+      if (hold.size) return;
+      root.classList.remove('paused');
+      restart();
+    };
+    // 进度条动画和定时器一起从头开始
+    function restart() {
+      clearTimeout(timer);
+      timer = undefined;
+      if (!root.classList.contains('autoplay') || hold.size) return;
+      resetBar();
+      timer = window.setTimeout(() => go(current + 1), interval);
+    }
+    const autoplay = () => {
+      const on = !reduce.matches && cards.length > 1;
+      root.classList.toggle('autoplay', on);
+      root.style.setProperty('--interval', `${interval}ms`);
+      restart();
+    };
+
+    root.addEventListener('pointerenter', (e) => e.pointerType === 'mouse' && pause('hover'));
+    root.addEventListener('pointerleave', () => resume('hover'));
+    root.addEventListener('focusin', () => pause('focus'));
+    root.addEventListener('focusout', (e) => !root.contains(e.relatedTarget as Node) && resume('focus'));
+    // 手指拖动过就不再自动播：用户已经在自己翻了
+    track.addEventListener('touchstart', () => pause('touch'), { passive: true });
+    document.addEventListener('visibilitychange', () => (document.hidden ? pause('hidden') : resume('hidden')));
+    new IntersectionObserver(([e]) => (e.isIntersecting ? resume('offscreen') : pause('offscreen')), { threshold: 0.35 }).observe(root);
+    reduce.addEventListener('change', autoplay);
+
+    setActive(nearest());
+    root.classList.add('ready');
+    autoplay();
+  }
+</script>
