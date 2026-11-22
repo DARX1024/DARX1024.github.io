@@ -651,7 +651,14 @@ const thumb = (up: boolean) =>
     root.addEventListener('pointerleave', () => resume('hover'));
     // 只有键盘聚焦才暂停：鼠标点箭头、手指点卡片也会让元素获得焦点，
     // 不区分的话点一下箭头之后就再也不自动播了
-    root.addEventListener('focusin', (e) => (e.target as Element).matches(':focus-visible') && pause('focus'));
+    const byKeyboard = (el: Element) => {
+      try {
+        return el.matches(':focus-visible');
+      } catch {
+        return true; // 不支持 :focus-visible 的老浏览器：照旧暂停
+      }
+    };
+    root.addEventListener('focusin', (e) => byKeyboard(e.target as Element) && pause('focus'));
     root.addEventListener('focusout', (e) => !root.contains(e.relatedTarget as Node) && resume('focus'));
     // 手指按住时暂停；松手后接着播（如果滑到了别的卡片，会从那一张重新计时）
     track.addEventListener('touchstart', () => pause('touch'), { passive: true });
