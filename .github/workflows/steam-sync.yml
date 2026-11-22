@@ -45,6 +45,7 @@ jobs:
           git push
           # 用 GITHUB_TOKEN 推送不会触发其他 workflow，这里手动触发部署。
           # 只有默认分支才部署：在别的分支上手动跑（比如试新功能）只提交数据，不发布
-          if [ "${GITHUB_REF_NAME}" = "${{ github.event.repository.default_branch }}" ]; then
+          # （定时触发时拿不到仓库信息，所以直接写分支名）
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
             gh workflow run deploy.yml --ref "${GITHUB_REF_NAME}"
           fi

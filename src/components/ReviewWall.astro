@@ -490,8 +490,11 @@ const thumb = (up: boolean) =>
       current = i;
       cards.forEach((c, k) => c.classList.toggle('on', k === i));
       dots.forEach((d, k) => (k === i ? d.setAttribute('aria-current', 'true') : d.removeAttribute('aria-current')));
-      // 进度条动画重新开始
-      const bar = dots[i]?.querySelector('span');
+      resetBar();
+    };
+    // 当前这条进度条的动画从头开始（和定时器保持同步）
+    const resetBar = () => {
+      const bar = dots[current]?.querySelector('span');
       if (bar) {
         bar.style.animation = 'none';
         void bar.offsetWidth;
@@ -567,6 +570,7 @@ const thumb = (up: boolean) =>
       clearTimeout(timer);
       timer = undefined;
       if (!root.classList.contains('autoplay') || hold.size) return;
+      resetBar();
       timer = window.setTimeout(() => go(current + 1), interval);
     }
     const autoplay = () => {
