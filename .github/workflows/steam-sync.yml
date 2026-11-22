@@ -1,6 +1,7 @@
 name: Sync Steam data
 
-# 每天从 Steam 拉一次游戏时长、成就和封面，写进 src/data/steam.json。
+# 每天从 Steam 拉一次游戏时长、成就和封面，写进 src/data/steam.json；
+# 再抓一次你写的 Steam 评测，写进 src/data/steam-reviews.json（生活页的评测墙用）。
 # 有变化才提交，然后触发一次部署。需要在仓库 Settings → Secrets and variables → Actions
 # 里添加 STEAM_API_KEY（没有也能跑，只是只能更新封面和名字）。
 on:
@@ -26,18 +27,24 @@ jobs:
         env:
           STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
           STEAM_ID: ${{ vars.STEAM_ID }}
+      - name: Fetch reviews from Steam
+        run: node scripts/steam-reviews.mjs
       - name: Commit and deploy if changed
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if git diff --quiet -- src/data/steam.json && [ -z "$(git ls-files --others --exclude-standard src/data/steam.json)" ]; then
+          FILES="src/data/steam.json src/data/steam-reviews.json"
+          if git diff --quiet -- $FILES && [ -z "$(git ls-files --others --exclude-standard $FILES)" ]; then
             echo "No changes."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/data/steam.json
+          git add $FILES
           git commit -m "Sync Steam data"
           git push
-          # 用 GITHUB_TOKEN 推送不会触发其他 workflow，这里手动触发部署
-          gh workflow run deploy.yml --ref "${GITHUB_REF_NAME}"
+          # 用 GITHUB_TOKEN 推送不会触发其他 workflow，这里手动触发部署。
+          # 只有默认分支才部署：在别的分支上手动跑（比如试新功能）只提交数据，不发布
+          if [ "${GITHUB_REF_NAME}" = "${{ github.event.repository.default_branch }}" ]; then
+            gh workflow run deploy.yml --ref "${GITHUB_REF_NAME}"
+          fi
