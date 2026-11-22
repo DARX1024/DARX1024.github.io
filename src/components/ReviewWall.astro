@@ -1,7 +1,7 @@
 ---
 // 评测墙：生活页上的一排 Steam 评测，横向滚动，参考 Steam 商店首页的「精选和推荐」轮播。
 // 一次一张宽卡片：左边是游戏横幅大图，右边是推荐与否、摘句和出处；两侧露出相邻的卡片。
-// 自动轮播（悬停、手指按住、键盘聚焦、滚出屏幕、切到别的标签页时暂停，恢复后接着剩下的时间走；
+// 自动轮播（鼠标停在当前卡片上、手指按住、键盘聚焦、滚出屏幕、切到别的标签页时暂停，恢复后接着剩下的时间走；
 // 系统开了「减少动态效果」时不自动播），
 // 也可以拖动 / 滑动、点箭头或下方的进度条切换。数据见 lib/games.ts 的 getReviewWall()。
 import { fmtDate } from '../lib/content';
@@ -498,7 +498,14 @@ const thumb = (up: boolean) =>
       cards.forEach((c, k) => c.classList.toggle('on', k === i));
       dots.forEach((d, k) => (k === i ? d.setAttribute('aria-current', 'true') : d.removeAttribute('aria-current')));
       resetBar();
+      syncHover();
     };
+    // 鼠标停在哪张卡片上（-1 表示不在任何卡片上）；只有停在当前这张上才暂停
+    let hovered = -1;
+    function syncHover() {
+      if (hovered >= 0 && hovered === current) pause('hover');
+      else resume('hover');
+    }
     // 当前这条进度条的动画从头开始（和定时器保持同步）
     const resetBar = () => {
       const bar = dots[current]?.querySelector('span');
@@ -647,8 +654,19 @@ const thumb = (up: boolean) =>
       restart();
     };
 
-    root.addEventListener('pointerenter', (e) => e.pointerType === 'mouse' && pause('hover'));
-    root.addEventListener('pointerleave', () => resume('hover'));
+    // 悬停暂停只看当前这张卡片：标题行、两侧露出来的卡片、轨道边上的空白和进度条都不算，
+    // 否则鼠标只是从评测墙上经过，自动播放就停了
+    cards.forEach((c, k) => {
+      c.addEventListener('pointerenter', (e) => {
+        if (e.pointerType !== 'mouse') return;
+        hovered = k;
+        syncHover();
+      });
+      c.addEventListener('pointerleave', () => {
+        if (hovered === k) hovered = -1;
+        syncHover();
+      });
+    });
     // 只有键盘聚焦才暂停：鼠标点箭头、手指点卡片也会让元素获得焦点，
     // 不区分的话点一下箭头之后就再也不自动播了
     const byKeyboard = (el: Element) => {
