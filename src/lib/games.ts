@@ -181,3 +181,115 @@ export async function hasLife() {
 export const fmtHours = (h?: number) =>
   h == null ? '' : h < 1 ? '不到 1 小时' : `${h < 10 ? Math.round(h * 10) / 10 : Math.round(h).toLocaleString('en-US')} 小时`;
 
+
+// ---------- Steam 评测（生活页的评测墙） ----------
+// src/data/steam-reviews.json 由 scripts/steam-reviews.mjs 抓取；展示哪几篇在 site.config.ts 的 GAMES.reviewWall 里挑
+
+interface SteamReview {
+  appid: number;
+  name?: string;
+  up: boolean; // 推荐 / 不推荐
+  hours?: number; // 现在的总时长
+  atReview?: number; // 写评测时的时长
+  posted?: string; // YYYY-MM-DD
+  updated?: string;
+  helpful?: number;
+  funny?: number;
+  url: string;
+  text: string;
+}
+const reviewsFile = Object.values(
+  import.meta.glob<{ reviews?: SteamReview[] }>('../data/steam-reviews.json', { eager: true, import: 'default' }),
+)[0];
+const steamReviews = new Map((reviewsFile?.reviews ?? []).map((r) => [r.appid, r]));
+
+export interface WallReview {
+  appid: number;
+  title: string;
+  up: boolean;
+  /** 评测自己的标题（原文第一行是短标题时） */
+  headline?: string;
+  /** 原文里「2025.7.8 全成就纪念」这种落款的后半句 */
+  memo?: string;
+  /** 卡片上的摘句 */
+  quote: string;
+  /** 正文还有没展示的部分 */
+  more: boolean;
+  hours?: number;
+  posted?: Date;
+  helpful?: number;
+  url: string;
+  hero?: string;
+  header?: string;
+  cover?: string;
+  /** 站内有没有这款游戏（有就能在游戏墙打开详情） */
+  slug?: string;
+}
+
+/** 拆出原文开头的短标题和「日期 + 纪念」落款，剩下的是正文 */
+function splitReview(text: string) {
+  const lines = text.split('\n');
+  let headline: string | undefined;
+  let memo: string | undefined;
+  for (let k = 0; k < 3 && lines.length; k++) {
+    const l = lines[0].trim();
+    const date = l.match(/^\d{4}[.\-/年]\d{1,2}[.\-/月]\d{1,2}日?\s*(.*)$/);
+    if (!l || /^[—–\-_=]{3,}$/.test(l)) lines.shift();
+    else if (date) {
+      memo = date[1].trim() || undefined;
+      lines.shift();
+    } else if (!headline && k === 0 && l.length <= 24 && !/[。！]$/.test(l)) {
+      headline = l.replace(/^【(.*)】$/, '$1');
+      lines.shift();
+    } else break;
+  }
+  return { headline, memo, body: lines.join('\n').trim() };
+}
+
+/** 从正文开头取一段做摘句：尽量在句末断开 */
+function excerpt(text: string, max = 150) {
+  const paras = text.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean);
+  let out = '';
+  for (const p of paras) {
+    if (!out) out = p;
+    else if (out.length + p.length < max * 0.8) out += ' ' + p;
+    else break;
+  }
+  if (out.length <= max) return out;
+  const cut = out.slice(0, max);
+  const end = Math.max(...['。', '！', '？', '…', '.', '!', '?'].map((c) => cut.lastIndexOf(c)));
+  return end > max * 0.5 ? cut.slice(0, end + 1) : cut.replace(/[，、,;；：:\s]*$/, '') + '……';
+}
+
+export async function getReviewWall(): Promise<WallReview[]> {
+  const games = await getGames();
+  const byApp = new Map(games.filter((g) => g.appid).map((g) => [g.appid!, g]));
+  return GAMES.reviewWall
+    .map(({ appid, quote }): WallReview | undefined => {
+      const r = steamReviews.get(appid);
+      if (!r || !r.text) return undefined;
+      const g = byApp.get(appid);
+      const s = steamById.get(appid);
+      const { headline, memo, body } = splitReview(r.text);
+      const q = quote?.trim() || excerpt(body);
+      return {
+        appid,
+        title: g?.title ?? s?.name ?? r.name ?? String(appid),
+        up: r.up,
+        headline,
+        memo,
+        quote: q,
+        more: body.replace(/\s+/g, '').length > q.replace(/\s+|……$/g, '').length + 4,
+        hours: r.hours ?? toHours(s?.minutes),
+        posted: r.posted ? new Date(r.posted) : undefined,
+        helpful: r.helpful,
+        url: r.url,
+        hero: g?.hero ?? s?.hero ?? steamHero(appid),
+        header: s?.header ?? steamHeader(appid),
+        cover: g?.cover ?? s?.cover ?? steamCover(appid),
+        slug: g?.slug,
+      };
+    })
+    .filter((r): r is WallReview => !!r)
+    .sort((a, b) => (b.posted?.valueOf() ?? 0) - (a.posted?.valueOf() ?? 0));
+}

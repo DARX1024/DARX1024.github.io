@@ -3,6 +3,7 @@
 // 和 steam-sync.mjs 一起由 .github/workflows/steam-sync.yml 每天跑一次；本地也可以手动跑：
 //   node scripts/steam-reviews.mjs
 //
+// - GAMES.hide 里的游戏（成人内容等）不收
 // - 评测是公开的，不需要 API Key：直接读个人主页的「评测」页（/recommended/）
 // - 个人主页从 src/site.config.ts 的 GAMES.steamProfile 读取
 // - 某一篇这次没抓到（网络、页面改版）时沿用上次的数据；整页都抓不到时不改文件
@@ -126,6 +127,14 @@ function parseReview(html, appid, url) {
   return Object.fromEntries(Object.entries(r).filter(([, v]) => v !== undefined));
 }
 
+/** site.config.ts 里 GAMES.hide 列出的 appid：不上墙的游戏，评测也不收 */
+function hiddenAppIds() {
+  const cfg = fs.readFileSync(path.join(ROOT, 'src/site.config.ts'), 'utf8');
+  const body = cfg.match(/\bhide:\s*\[([\s\S]*?)\]/)?.[1] ?? '';
+  const noComments = body.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  return new Set((noComments.match(/\d+/g) ?? []).map(Number));
+}
+
 function readOld() {
   try {
     return JSON.parse(fs.readFileSync(OUT, 'utf8'));
@@ -160,11 +169,14 @@ async function main() {
     return;
   }
   log(`找到 ${ids.length} 篇评测`);
+  const hidden = hiddenAppIds();
+  const wanted = ids.filter((id) => !hidden.has(id));
+  if (wanted.length < ids.length) log(`跳过 ${ids.length - wanted.length} 篇（hide 名单里的游戏）`);
 
   // 2. 逐篇读详情页
   const reviews = [];
   let kept = 0;
-  for (const appid of ids) {
+  for (const appid of wanted) {
     const url = `${base}${appid}/`;
     const html = await getText(`${url}?l=english`);
     const r = html && parseReview(html, appid, url);
