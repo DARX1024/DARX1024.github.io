@@ -338,6 +338,11 @@ main {
 .page-title + .muted {
   margin-top: 2.5rem;
 }
+/* 栏目页（笔记/可视化/生活/关于/博客）的标题和导航当前项重复，只留给读屏和搜索引擎；
+   紧随其后的第一块内容不再需要和标题拉开距离 */
+main .page-title.sr-only + * {
+  margin-top: 0;
+}
 .section-label {
   font-size: 0.8125rem;
   font-weight: 500;
