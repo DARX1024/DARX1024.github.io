@@ -40,7 +40,8 @@ h1,h2,h3{font-family:var(--f-head);font-weight:600;margin:0;line-height:1.25;tex
 h1{font-size:clamp(26px,3.6vw,38px)}h2{font-size:20px;margin-bottom:6px}h3{font-size:15px}
 .band{padding:clamp(20px,3vw,40px) max(4vw,16px)}.wrap{max-width:1240px;margin:0 auto}
 .top{background:var(--band);color:var(--bandink)}.top .intro{margin-top:10px;max-width:72ch;opacity:.9}.top .intro p{margin:0}
-#diag{margin-top:14px;font-weight:600;font-size:16px}#diag b{color:var(--hot)}
+/* 诊断行和学习率提示的文字长短会变：预留两行高度，脚本再按出现过的最大高度撑住，换行时下面的内容不跳 */
+#diag{margin-top:14px;font-weight:600;font-size:16px;min-height:3.4em}#lrinfo{min-height:3em}#diag b{color:var(--hot)}
 /* 公式：字号与站点笔记一致（src/styles/prose.css）；独占一行的公式左右可滚动，窄屏不撑破版面 */
 .katex{font-size:1.08em}
 .katex-display{margin:.5em 0 .7em;overflow-x:auto;overflow-y:hidden;padding-block:.2em}
@@ -75,6 +76,7 @@ th{font-weight:600;color:var(--ink2)}.scroll{overflow-x:auto;max-height:520px}
 .notes p{margin:0 0 12px;max-width:70ch}.notes .katex-display{margin:-.2em 0 .9em;max-width:70ch}.notes code{font-size:14px}.copy{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 pre,.scroll{overflow-x:auto}code{overflow-wrap:anywhere}
 @media(max-width:760px){.lab{grid-template-columns:minmax(0,1fr)}.stage{order:1}.ctrl{order:2}.two{grid-template-columns:minmax(0,1fr)}.multi{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:520px){#diag{min-height:5.1em}}
 @media(max-width:420px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
 </style>
@@ -308,8 +310,8 @@ function paint(){const tr=rmse(opt.w,D.x,D.y,S.sc),te=rmse(opt.w,T.x,T.y,S.sc),w
  else if(te>1.25*s+0.05&&te-tr>0.4*s+0.05)d=`<b>过拟合</b>：训练 RMSE ${fmt(tr)}${tr<s?' 低于噪声 '+eq('sigma',s):''}，测试 RMSE ${fmt(te)} 明显高于 ${TeX('sigma')}，两者差距 ${fmt(te-tr)}。`;
  else if(tr>1.25*thr&&te>1.25*thr)d=`<b>欠拟合</b>：训练和测试 RMSE（${fmt(tr)} / ${fmt(te)}）都明显高于噪声 ${eq('sigma',s)}。`;
  else d=`拟合合理：训练 / 测试 RMSE = ${fmt(tr)} / ${fmt(te)}，接近噪声水平 ${eq('sigma',s)}。`;
- $('diag').innerHTML=`${eq('M',S.M)}，${eq('N',S.N)}，${S.l2?eq('lnl',S.lnl):eq('lam',0)} · `+d;
- const r=S.lr*L,lim=S.opt==='mom'?3.8:2;$('lrinfo').innerHTML=S.opt==='cf'||S.opt==='cg'?'此方法不使用学习率。':S.opt==='adam'?`Adam 按坐标自适应缩放，${TeX('eta')} 是每步大致的更新幅度。`:`${eq('L',fmt(L))}，${eq('etaL',r.toFixed(3))}`+(r>lim?` <span class="bad">&gt; ${lim}，会发散</span>`:`（稳定上限 ${lim}）`);
+ hold($('diag'),`${eq('M',S.M)}，${eq('N',S.N)}，${S.l2?eq('lnl',S.lnl):eq('lam',0)} · `+d);
+ const r=S.lr*L,lim=S.opt==='mom'?3.8:2;hold($('lrinfo'),S.opt==='cf'||S.opt==='cg'?'此方法不使用学习率。':S.opt==='adam'?`Adam 按坐标自适应缩放，${TeX('eta')} 是每步大致的更新幅度。`:`${eq('L',fmt(L))}，${eq('etaL',r.toFixed(3))}`+(r>lim?` <span class="bad">&gt; ${lim}，会发散</span>`:`（稳定上限 ${lim}）`));
  $('coef').innerHTML=Array.from(opt.w,(v,j)=>`<tr><td>${j}</td><td>${fmt(v)}</td><td>${fmt(ws[j])}</td></tr>`).join('')+`<tr><td>${TeX('wn')}</td><td>${fmt(wn)}</td><td>${fmt(Math.sqrt(dot(ws,ws)))}</td></tr>`;
  drawFit();drawLoss()}
 
@@ -335,6 +337,11 @@ async function copy(txt){try{await navigator.clipboard.writeText(txt);$('cpmsg')
 $('cpsum').addEventListener('click',()=>{const tr=rmse(opt.w,D.x,D.y,S.sc),te=rmse(opt.w,T.x,T.y,S.sc);copy(`N=${S.N} sigma=${S.sig} sampling=${S.grid?'grid':'random'} seed=${S.seed}\nM=${S.M} scaled=${S.sc} lambda=${S.l2?'exp('+S.lnl+')':0}\noptimizer=${S.opt} lr=${S.lr} iters=${opt.it}\ntrain_rmse=${tr} test_rmse=${te}\nclosed_form_train=${cfR.tr} closed_form_test=${cfR.te}\nkappa=${L/eig[0]}\nw=${Array.from(opt.w).join(',')}\nw_star=${Array.from(ws).join(',')}`)});
 $('cpcsv').addEventListener('click',()=>copy(['sweep,x,train_rmse,test_rmse',...['m','l','n'].flatMap(k=>sweep[k].map(r=>[{m:'M',l:'ln_lambda',n:'N'}[k],...r].join(',')))].join('\n')));
 
+// 写入会变长变短的文字时，高度只增不减（宽度变了再重新量），避免页面上下抖动
+const held=new WeakMap();
+function hold(el,html){if(el.innerHTML!==html)el.innerHTML=html;const w=el.clientWidth;let t=held.get(el);
+ if(!t||t.w!==w){t={w,h:0};held.set(el,t);el.style.minHeight=''}
+ const h=el.getBoundingClientRect().height;if(h>t.h){t.h=h;el.style.minHeight=h+'px'}}
 const ro=new ResizeObserver(()=>{paint();paintSweeps()});ro.observe($('f_fit'));
 const mo=new MutationObserver(()=>{paint();paintSweeps()});mo.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme','data-embedded','style']});
 document.fonts?.addEventListener('loadingdone',()=>{paint();paintSweeps()});
