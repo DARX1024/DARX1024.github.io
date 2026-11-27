@@ -30,7 +30,11 @@ const THEMES = {
   dark: { bg: '#171513', 'bg-soft': '#201d1a', fg: '#e6dccb', 'fg-soft': '#c2b6a2', muted: '#8a7f70', border: '#2c2824', accent: '#d9a55b' },
 };
 // 缩略图里把可视化自己的数据色收成单色：主体用前景色，一条用强调色，其余用弱前景色
-const inkOf = (t) => ({ '--vec': t.fg, '--re': t.accent, '--env': t.muted, '--im': t['fg-soft'] });
+const inkOf = (t) => ({
+  '--vec': t.fg, '--re': t.accent, '--env': t.muted, '--im': t['fg-soft'],
+  // polyfit-lab：当前拟合 / 训练、测试 / 解析解、当前设置
+  '--c1': t.accent, '--c2': t.muted, '--c3': t['fg-soft'], '--acc': t.accent,
+});
 
 const meta = (html, name) =>
   html.match(new RegExp(`<meta[^>]+name=["']${name}["'][^>]*content=["']([^"']*)["']`, 'i'))?.[1];

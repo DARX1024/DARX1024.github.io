@@ -109,6 +109,7 @@ URL 规则：`blog/xxx.md → /blog/xxx/`，`notes/signals-and-systems/02 卷积
 - 不要引用 Google Fonts 等外部字体，直接用系统字体栈
 - 自动出现在 `/viz/` 图库里，浏览页是 `/viz/foo/`，原始页面是 `/viz-raw/foo.html`
 - 下划线开头的文件/文件夹（如 `viz-raw/_shared/`）只复制、不进图库，适合放公共脚本
+- 公式：在 HTML 正文里写 `\( … \)`（行内）或 `\[ … \]`（独占一行），构建时用 KaTeX 预渲染，和笔记里的公式一致，不需要引入任何脚本。`<script>`、`<style>` 里的内容不处理；JS 拼出来的文字要用公式，可以先在一个 `hidden` 元素里写好再取它的 `innerHTML`（参考 `viz-raw/polyfit-lab.html` 的 `#tex`）。直接用浏览器打开源文件时公式显示为 TeX 原文，用 `npm run dev` 看
 
 图库的标题、简介来自 HTML 本身：
 
@@ -125,7 +126,7 @@ URL 规则：`blog/xxx.md → /blog/xxx/`，`notes/signals-and-systems/02 卷积
 ### 缩略图
 
 首页和图库的卡片用 `viz-raw/_thumbs/<名字>-light.png` 和 `<名字>-dark.png`（透明底线稿，跟随主题切换），没有就显示文字封面。
-截图时会把可视化里的 `--vec` `--re` `--env` `--im` 这几个数据色收成站点的前景色 + 强调色，和首页地球仪保持同一种线稿风格；
+截图时会把可视化里的 `--vec` `--re` `--env` `--im`（以及 `--c1` `--c2` `--c3` `--acc`）这几个数据色收成站点的前景色 + 强调色，和首页地球仪保持同一种线稿风格；
 自己的可视化如果用了别的颜色变量名，在 `scripts/viz-thumbs.mjs` 的 `inkOf` 里加上即可。生成方法：
 
 ```bash

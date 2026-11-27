@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>多项式拟合与梯度下降</title>
+<meta name="description" content="用 M 阶多项式拟合带噪声的 sin(2πx)：看过拟合怎么出现，L2 正则和更多样本怎么把它压下去，以及有限步的梯度下降为什么自带早停式的正则化。">
+<meta name="viz:date" content="2026-11-27">
+<meta name="viz:tags" content="机器学习, 梯度下降, 正则化">
+<meta name="viz:thumb" content="#f_fit">
+<style>
+/* VOICE: lab bench, precise and quiet; numbers first, prose only where it explains a plot
+   IDEA: a printed lab poster whose figures are live — the fit, its training curve, and three sweeps as small multiples
+   PICTURE: the fit plot itself, large, with data, truth sin(2πx), current w and the closed-form w*
+   COLOUR and TYPE: oxford blue band, white panels, magenta for the current selection; system sans + serif headings (no web fonts)
+   LAYOUT: title band; controls left / figures right; sweep small multiples sharing one RMSE scale; coefficient table + notes
+   MATH: \( … \) / \[ … \] in the markup are pre-rendered by KaTeX when the site copies viz-raw/ (src/plugins/viz.mjs);
+         formulas built by JS reuse the rendered snippets in #tex */
+:root{color-scheme:light dark;
+--bg:light-dark(#ffffff,#070f26);--panel:light-dark(#ffffff,#0d1838);--line:light-dark(#d9dee8,#22305a);--grid:light-dark(#eceff5,#17224a);
+--ink:light-dark(#121a2e,#eef1f8);--ink2:light-dark(#5a6378,#9aa5c0);--band:#0b1f4b;--bandink:#ffffff;--hot:#ff7aa8;
+--acc:light-dark(#e0115f,#ff4d8d);--c1:light-dark(#257de0,#338ced);--c2:light-dark(#f47230,#e76624);--c3:light-dark(#6a4ce2,#9887ef);--warn:light-dark(#b3261e,#ff8a80);
+--btn:light-dark(#eef1f7,#16234a);--ui:var(--acc);
+--f-body:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",system-ui,sans-serif;
+--f-head:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Songti SC","Noto Serif CJK SC","PingFang SC","Microsoft YaHei",serif}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+/* 嵌入网站时：网站给 <html> 加 data-embedded 并传入 --site-* 配色和字体，这里接上，让页面和正文融为一体。
+   数据色（--c1 --c2 --c3 --acc）保留自己的，跟着 data-theme 切换亮/暗两套 */
+:root[data-embedded]{--bg:var(--site-bg);--panel:var(--site-bg-soft);--line:var(--site-border);--grid:color-mix(in srgb,var(--site-border) 65%,var(--site-bg-soft));
+--ink:var(--site-fg);--ink2:var(--site-muted);--btn:var(--site-bg);--ui:var(--site-accent);--band:transparent;--bandink:var(--site-fg);--hot:var(--acc);
+--f-body:var(--site-font-body);--f-head:var(--site-font-heading)}
+:root[data-embedded] body{background:transparent}
+:root[data-embedded] .top h1{display:none}
+:root[data-embedded] .band{padding-inline:2px}
+:root[data-embedded] .top{padding-top:4px}
+:root[data-embedded] .top .intro{opacity:1;color:var(--site-fg-soft)}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 var(--f-body);overflow-x:clip;font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--f-head);font-weight:600;margin:0;line-height:1.25;text-wrap:balance}
+h1{font-size:clamp(26px,3.6vw,38px)}h2{font-size:20px;margin-bottom:6px}h3{font-size:15px}
+.band{padding:clamp(20px,3vw,40px) max(4vw,16px)}.wrap{max-width:1240px;margin:0 auto}
+.top{background:var(--band);color:var(--bandink)}.top .intro{margin-top:10px;max-width:72ch;opacity:.9}.top .intro p{margin:0}
+#diag{margin-top:14px;font-weight:600;font-size:16px}#diag b{color:var(--hot)}
+/* 公式：字号与站点笔记一致（src/styles/prose.css）；独占一行的公式左右可滚动，窄屏不撑破版面 */
+.katex{font-size:1.08em}
+.katex-display{margin:.5em 0 .7em;overflow-x:auto;overflow-y:hidden;padding-block:.2em}
+.katex-display>.katex{font-size:1.12em}
+.km{font-family:KaTeX_Main,"Times New Roman",serif;font-size:1.08em;font-weight:400;white-space:nowrap}.km .rel{margin:0 .2778em}
+.lab{display:grid;grid-template-columns:300px minmax(0,1fr);gap:24px;align-items:start}
+.ctrl{border:1px solid var(--line);border-radius:10px;padding:16px;background:var(--panel)}
+.ctrl fieldset{border:0;padding:0;margin:0 0 16px}.ctrl legend{font:600 15px var(--f-head);margin-bottom:6px}
+.row{display:grid;grid-template-columns:5.2em minmax(0,1fr) 4.2em;gap:8px;align-items:center;margin:4px 0;font-size:14px}
+.row output{text-align:right;white-space:nowrap}.row2{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0;font-size:14px}
+input[type=range]{width:100%;accent-color:var(--ui);height:28px}
+select,input[type=number]{font:inherit;font-size:16px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);min-height:40px}
+input[type=number]{width:7.5em}input[type=checkbox]{width:18px;height:18px;accent-color:var(--ui)}
+button{font:600 14px var(--f-body);min-height:40px;padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:var(--btn);color:var(--ink);cursor:pointer}
+button.pri{background:var(--ui);border-color:var(--ui);color:var(--panel)}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--ui);outline-offset:2px}
+:root:not([data-embedded]) button.pri{color:#fff}
+.hint{font-size:13px;color:var(--ink2);margin:4px 0 0}.bad{color:var(--warn);font-weight:600}
+.pre{display:flex;flex-wrap:wrap;gap:6px}.pre button{font-weight:500;font-size:13px;min-height:36px}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:14px}
+.tile{background:var(--panel);padding:10px 12px}.tile>span{display:block;font-size:13px;color:var(--ink2)}.tile b{font:600 21px var(--f-body);white-space:nowrap}
+.tile.hot b{color:var(--acc)}
+.fig{position:relative;min-height:340px}.fig>canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.fig.sm{min-height:230px}.fig.loss{min-height:240px}
+.panel{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 6px;margin-bottom:14px}
+.key{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--ink2);margin:0 0 6px}.key i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:6px}
+.key i.dot{width:9px;height:9px;border:1.5px solid;border-radius:50%}.key i.dash{border-top-style:dashed}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px;line-height:1.5;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.12);display:none;z-index:2}
+.multi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:24px;align-items:start}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--ink2)}.scroll{overflow-x:auto;max-height:520px}
+.notes p{margin:0 0 12px;max-width:70ch}.notes .katex-display{margin:-.2em 0 .9em;max-width:70ch}.notes code{font-size:14px}.copy{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+pre,.scroll{overflow-x:auto}code{overflow-wrap:anywhere}
+@media(max-width:760px){.lab{grid-template-columns:minmax(0,1fr)}.stage{order:1}.ctrl{order:2}.two{grid-template-columns:minmax(0,1fr)}.multi{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:420px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<header class="band top"><div class="wrap">
+<h1>多项式拟合与梯度下降</h1>
+<div class="intro">
+ <p>数据由 \(\sin(2\pi x)\) 加高斯噪声生成，再用 \(M\) 阶多项式去拟合：</p>
+ \[ y = \sin(2\pi x) + \varepsilon,\qquad \varepsilon \sim \mathcal{N}(0,\sigma^2) \]
+ \[ y(x,\boldsymbol{w}) = \sum_{j=0}^{M} w_j\,u^j \]
+ <p>勾选特征缩放时 \(u = 2x-1\)，否则 \(u = x\)；\(\boldsymbol{\Phi}\) 是 \(N\times(M+1)\) 的设计矩阵，\(\Phi_{ij} = u_i^{\,j}\)。损失是带 L2 惩罚的均方误差，梯度按下式手写，没有用自动微分：</p>
+ \[ \begin{aligned}
+   E(\boldsymbol{w}) &= \frac{1}{2N}\,\lVert \boldsymbol{\Phi}\boldsymbol{w} - \boldsymbol{y} \rVert^2 + \frac{\lambda}{2}\,\lVert \boldsymbol{w} \rVert^2 \\
+   \nabla E(\boldsymbol{w}) &= \frac{1}{N}\,\boldsymbol{\Phi}^{\top}(\boldsymbol{\Phi}\boldsymbol{w} - \boldsymbol{y}) + \lambda\boldsymbol{w}
+ \end{aligned} \]
+</div>
+<div id="diag" aria-live="polite"></div>
+</div></header>
+
+<main class="band"><div class="wrap lab">
+<aside class="ctrl">
+ <fieldset><legend>预设实验</legend><div class="pre" id="presets">
+  <button data-i="0">欠拟合 \(M=1\)</button><button data-i="1">合适 \(M=3\)</button><button data-i="2">过拟合 \(M=9\)</button>
+  <button data-i="3">加 L2，\(\ln\lambda=-18\)</button><button data-i="4">增加样本 \(N=100\)</button>
+  <button data-i="5">GD 与早停</button><button data-i="6">CG 快速收敛</button><button data-i="7">学习率过大</button><button data-i="8">不缩放特征</button>
+ </div></fieldset>
+ <fieldset><legend>数据</legend>
+  <div class="row"><label for="N">样本数 \(N\)</label><input type="range" id="N" min="2" max="200" value="10"><output id="oN"></output></div>
+  <div class="row"><label for="sig">噪声 \(\sigma\)</label><input type="range" id="sig" min="0" max="1" step="0.05" value="0.3"><output id="osig"></output></div>
+  <div class="row2"><label for="samp">采样</label><select id="samp"><option value="grid">均匀网格</option><option value="rand">均匀随机</option></select>
+   <label for="seed">种子</label><input type="number" id="seed" value="1" min="0"></div>
+  <div class="row2"><button id="reseed">换一组数据</button></div>
+ </fieldset>
+ <fieldset><legend>模型</legend>
+  <div class="row"><label for="M">阶数 \(M\)</label><input type="range" id="M" min="0" max="15" value="9"><output id="oM"></output></div>
+  <div class="row2"><input type="checkbox" id="sc" checked><label for="sc">特征缩放 \(u = 2x-1\)</label></div>
+  <div class="row2"><input type="checkbox" id="l2"><label for="l2">L2 惩罚项</label></div>
+  <div class="row"><label for="lnl">\(\ln\lambda\)</label><input type="range" id="lnl" min="-40" max="0" step="0.5" value="-18"><output id="olnl"></output></div>
+ </fieldset>
+ <fieldset><legend>优化</legend>
+  <div class="row2"><label for="opt">方法</label><select id="opt"><option value="cf">解析解（QR 求最小二乘）</option><option value="gd">梯度下降 GD</option><option value="mom">GD + 动量 β = 0.9</option><option value="adam">Adam</option><option value="cg">共轭梯度 CG</option></select></div>
+  <div class="row2"><label for="lr">学习率 \(\eta\)</label><input type="number" id="lr" step="any" value="0.5"><input type="checkbox" id="lrauto" checked><label for="lrauto">自动</label></div>
+  <p class="hint" id="lrinfo"></p>
+  <div class="row2"><label for="maxit">迭代上限</label><select id="maxit"><option>1000</option><option>10000</option><option selected>100000</option><option>1000000</option></select></div>
+  <div class="row2"><label for="spd">每帧步数</label><select id="spd"><option>1</option><option>10</option><option selected>100</option><option>1000</option><option>10000</option></select></div>
+  <div class="row2"><button class="pri" id="run">开始训练</button><button id="one">单步</button><button id="reset">重置 \(\boldsymbol{w}=\boldsymbol{0}\)</button></div>
+ </fieldset>
+</aside>
+
+<div class="stage">
+ <div class="tiles" id="tiles"></div>
+ <div class="panel">
+  <div class="key"><span><i class="dot" style="color:var(--ink)"></i>训练样本</span><span><i class="dash" style="color:var(--ink2)"></i>真实 \(\sin(2\pi x)\)</span><span><i style="color:var(--c1)"></i>当前 \(\boldsymbol{w}\)（所选方法）</span><span><i class="dash" style="color:var(--c3)"></i>解析解 \(\boldsymbol{w}^\star\)</span><label><input type="checkbox" id="showtest"> 显示测试点</label></div>
+  <div class="fig" id="f_fit"><canvas></canvas><div class="tip"></div></div>
+ </div>
+ <div class="panel">
+  <h3>训练曲线：RMSE 随迭代次数（双对数）</h3>
+  <div class="key"><span><i style="color:var(--c1)"></i>训练</span><span><i style="color:var(--c2)"></i>测试</span><span><i class="dash" style="color:var(--c1)"></i>解析解·训练</span><span><i class="dash" style="color:var(--c2)"></i>解析解·测试</span><span id="best"></span></div>
+  <div class="fig loss" id="f_loss"><canvas></canvas><div class="tip"></div></div>
+ </div>
+</div>
+</div></main>
+
+<section class="band" style="padding-top:0"><div class="wrap">
+ <h2>对比实验：阶数、正则强度、样本量</h2>
+ <p class="hint" style="margin-bottom:12px">三张图共用同一 RMSE 对数纵轴，都用解析解计算（只看模型与数据，不受优化器影响）。点击图中任意位置即可把该参数设为对应值；洋红竖线是当前设置。样本量曲线取 20 组随机数据的平均。</p>
+ <div class="key"><span><i style="color:var(--c1)"></i>训练 RMSE</span><span><i style="color:var(--c2)"></i>测试 RMSE</span><span><i class="dash" style="color:var(--ink2)"></i>噪声水平 \(\sigma\)</span></div>
+ <div class="multi">
+  <div class="panel"><h3 id="t_m">RMSE 与阶数 \(M\)</h3><div class="fig sm" id="f_m"><canvas></canvas><div class="tip"></div></div></div>
+  <div class="panel"><h3 id="t_l">RMSE 与 \(\ln\lambda\)</h3><div class="fig sm" id="f_l"><canvas></canvas><div class="tip"></div></div></div>
+  <div class="panel"><h3 id="t_n">RMSE 与样本数 \(N\)</h3><div class="fig sm" id="f_n"><canvas></canvas><div class="tip"></div></div></div>
+ </div>
+</div></section>
+
+<section class="band" style="padding-top:0"><div class="wrap two">
+ <div><h2>系数 \(\boldsymbol{w}\)</h2><p class="hint">过拟合时 \(\lVert\boldsymbol{w}\rVert\) 会爆炸：系数正负交替、彼此抵消，才能让曲线穿过每个噪声点。</p>
+  <div class="scroll"><table><thead><tr><th>\(j\)</th><th>当前 \(w_j\)</th><th>解析解 \(w^\star_j\)</th></tr></thead><tbody id="coef"></tbody></table></div></div>
+ <div class="notes"><h2>怎么读这些图</h2>
+  <p><b>过拟合</b>：\(M=9\)、\(N=10\)、\(\lambda=0\) 时，10 个参数刚好能插值 10 个点，训练 RMSE ≈ 0，但曲线在样本之间剧烈振荡，测试 RMSE 远高于噪声 \(\sigma\)。模型拟合的是这一组噪声，而不是 sin。</p>
+  <p><b>两种克服方法</b>：加 L2 惩罚（\(\ln\lambda\approx-18\) 时测试误差就明显下降，\(\lambda\) 再大又会欠拟合，测试曲线呈 U 形）；或者增加样本（\(N=100\) 时同样的 \(M=9\) 也很平滑）。</p>
+  <p><b>梯度下降为什么很难“过拟合”</b>：损失是二次函数，梯度可以写成 \(\nabla E(\boldsymbol{w}) = \boldsymbol{A}\boldsymbol{w}-\boldsymbol{b}\)，Hessian 是常数矩阵</p>
+  \[ \boldsymbol{A} = \frac{1}{N}\,\boldsymbol{\Phi}^{\top}\boldsymbol{\Phi} + \lambda\boldsymbol{I},\qquad \boldsymbol{b} = \frac{1}{N}\,\boldsymbol{\Phi}^{\top}\boldsymbol{y} \]
+  <p>它的条件数 \(\kappa\) 极大（见顶部指标）。GD 的步长受最大特征值 \(L\) 限制：</p>
+  \[ 0 < \eta < \frac{2}{L},\qquad L = \lambda_{\max}(\boldsymbol{A}),\qquad \kappa = \frac{\lambda_{\max}(\boldsymbol{A})}{\lambda_{\min}(\boldsymbol{A})} \]
+  <p>于是沿最小特征方向收敛要约 \(\kappa\) 步。高频振荡模式恰好落在这些方向上，所以有限步的 GD 相当于早停，自带隐式正则化。可以看训练曲线里测试 RMSE 先降后升。关掉特征缩放，\(\kappa\) 会再大好几个数量级。</p>
+  <p><b>CG</b> 在精确算术下 \(M+1\) 步收敛到 \(\boldsymbol{w}^\star\)；浮点下会多几步，但仍远快于 GD。</p>
+  <div class="copy"><button id="cpsum">复制当前配置与结果</button><button id="cpcsv">复制扫描数据 CSV</button><span id="cpmsg" class="hint"></span></div>
+ </div>
+</div></section>
+
+<!-- JS 拼出来的文字里要用到的公式片段：构建时和正文一起由 KaTeX 渲染，脚本按 data-k 取用 -->
+<div id="tex" hidden>
+ <span data-k="x">\(x\)</span><span data-k="sin">\(\sin(2\pi x)\)</span><span data-k="w">\(\boldsymbol{w}\)</span><span data-k="ws">\(\boldsymbol{w}^\star\)</span>
+ <span data-k="wn">\(\lVert\boldsymbol{w}\rVert_2\)</span><span data-k="kappa">\(\kappa(\boldsymbol{A})\)</span>
+ <span data-k="M">\(M\)</span><span data-k="N">\(N\)</span><span data-k="sigma">\(\sigma\)</span><span data-k="lam">\(\lambda\)</span><span data-k="lnl">\(\ln\lambda\)</span>
+ <span data-k="eta">\(\eta\)</span><span data-k="etaL">\(\eta L\)</span><span data-k="L">\(L = \lambda_{\max}(\boldsymbol{A})\)</span><span data-k="2L">\(2/L\)</span>
+</div>
+<span id="probe" style="position:absolute;visibility:hidden"></span>
+<script>
+// ---- numerical core: no autodiff, every gradient written by hand ----
+const TAU=2*Math.PI;
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function randn(r){let u=0;while(u===0)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(TAU*r())}
+function genData(N,sigma,seed,grid){const r=rng(seed),x=[],y=[];for(let i=0;i<N;i++){const xi=grid?(N===1?0.5:i/(N-1)):r();x.push(xi)}if(!grid)x.sort((a,b)=>a-b);for(const xi of x)y.push(Math.sin(TAU*xi)+sigma*randn(r));return{x,y}}
+function feat(x,M,scaled){const u=scaled?2*x-1:x,f=new Float64Array(M+1);let p=1;for(let j=0;j<=M;j++){f[j]=p;p*=u}return f}
+function design(xs,M,scaled){return xs.map(x=>feat(x,M,scaled))}
+function predict(w,x,scaled){const u=scaled?2*x-1:x;let s=0;for(let j=w.length-1;j>=0;j--)s=s*u+w[j];return s}
+function rmse(w,X,Y,scaled){let s=0;for(let i=0;i<X.length;i++){const d=predict(w,X[i],scaled)-Y[i];s+=d*d}return Math.sqrt(s/X.length)}
+// normal-equation pieces: A = Phi^T Phi / N + lam I,  b = Phi^T y / N
+function normalEq(Phi,y,lam){const N=Phi.length,D=Phi[0].length,A=[],b=new Float64Array(D);for(let j=0;j<D;j++)A.push(new Float64Array(D));for(let i=0;i<N;i++){const f=Phi[i];for(let j=0;j<D;j++){b[j]+=f[j]*y[i]/N;for(let k=j;k<D;k++)A[j][k]+=f[j]*f[k]/N}}for(let j=0;j<D;j++){A[j][j]+=lam;for(let k=0;k<j;k++)A[j][k]=A[k][j]}return{A,b}}
+// closed form via Householder QR on [Phi/sqrt(N); sqrt(lam) I] w = [y/sqrt(N); 0]  (stable, avoids squaring kappa)
+function closedForm(Phi,y,lam){const N=Phi.length,D=Phi[0].length;const l=(lam===0&&N<D)?1e-14:lam;const R=[],t=[],s=1/Math.sqrt(N);for(let i=0;i<N;i++){R.push(Float64Array.from(Phi[i],v=>v*s));t.push(y[i]*s)}if(l>0)for(let j=0;j<D;j++){const r=new Float64Array(D);r[j]=Math.sqrt(l);R.push(r);t.push(0)}const m=R.length;for(let k=0;k<D;k++){let nrm=0;for(let i=k;i<m;i++)nrm+=R[i][k]**2;nrm=Math.sqrt(nrm);if(nrm===0)continue;const a=R[k][k]>0?-nrm:nrm;const v=new Float64Array(m);for(let i=k;i<m;i++)v[i]=R[i][k];v[k]-=a;let vv=0;for(let i=k;i<m;i++)vv+=v[i]*v[i];if(vv===0)continue;for(let j=k;j<D;j++){let d=0;for(let i=k;i<m;i++)d+=v[i]*R[i][j];d=2*d/vv;for(let i=k;i<m;i++)R[i][j]-=d*v[i]}let d=0;for(let i=k;i<m;i++)d+=v[i]*t[i];d=2*d/vv;for(let i=k;i<m;i++)t[i]-=d*v[i]}const w=new Float64Array(D);for(let k=D-1;k>=0;k--){let s2=t[k];for(let j=k+1;j<D;j++)s2-=R[k][j]*w[j];w[k]=Math.abs(R[k][k])<1e-300?0:s2/R[k][k]}return w}
+// symmetric eigenvalues by cyclic Jacobi (D<=16)
+function eigSym(A0){const n=A0.length,A=A0.map(r=>Float64Array.from(r));for(let sw=0;sw<60;sw++){let off=0;for(let p=0;p<n;p++)for(let q=p+1;q<n;q++)off+=A[p][q]**2;if(off<1e-30)break;for(let p=0;p<n;p++)for(let q=p+1;q<n;q++){if(Math.abs(A[p][q])<1e-300)continue;const th=(A[q][q]-A[p][p])/(2*A[p][q]);const tt=Math.sign(th||1)/(Math.abs(th)+Math.sqrt(th*th+1));const c=1/Math.sqrt(tt*tt+1),s=tt*c;for(let k=0;k<n;k++){const akp=A[k][p],akq=A[k][q];A[k][p]=c*akp-s*akq;A[k][q]=s*akp+c*akq}for(let k=0;k<n;k++){const apk=A[p][k],aqk=A[q][k];A[p][k]=c*apk-s*aqk;A[q][k]=s*apk+c*aqk}}}return Array.from({length:n},(_,i)=>A[i][i]).sort((a,b)=>a-b)}
+function matvec(A,v){const D=v.length,o=new Float64Array(D);for(let j=0;j<D;j++){let s=0;for(let k=0;k<D;k++)s+=A[j][k]*v[k];o[j]=s}return o}
+const dot=(a,b)=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s};
+// E(w) = 1/(2N)||Phi w - y||^2 + lam/2 ||w||^2  ;  grad = Phi^T(Phi w - y)/N + lam w = A w - b
+function lossE(w,Phi,y,lam){let s=0;for(let i=0;i<Phi.length;i++){const d=dot(Phi[i],w)-y[i];s+=d*d}return s/(2*Phi.length)+lam/2*dot(w,w)}
+function newOpt(kind,D,A,b){const st={kind,w:new Float64Array(D),it:0,m:new Float64Array(D),v:new Float64Array(D),done:false};if(kind==='cg'){st.r=Float64Array.from(b);st.p=Float64Array.from(b);st.rr=dot(st.r,st.r);st.r0=Math.sqrt(st.rr)||1}return st}
+function step(st,A,b,lr){const w=st.w,D=w.length;st.it++;if(st.kind==='cg'){if(st.done)return;const Ap=matvec(A,st.p),pAp=dot(st.p,Ap);if(!(pAp>0)){st.done=true;return}const al=st.rr/pAp;for(let j=0;j<D;j++){w[j]+=al*st.p[j];st.r[j]-=al*Ap[j]}const rr2=dot(st.r,st.r);if(Math.sqrt(rr2)<1e-13*st.r0){st.done=true}const be=rr2/st.rr;for(let j=0;j<D;j++)st.p[j]=st.r[j]+be*st.p[j];st.rr=rr2;return}
+ const g=matvec(A,w);for(let j=0;j<D;j++)g[j]-=b[j];
+ if(st.kind==='gd'){for(let j=0;j<D;j++)w[j]-=lr*g[j]}
+ else if(st.kind==='mom'){for(let j=0;j<D;j++){st.m[j]=0.9*st.m[j]+g[j];w[j]-=lr*st.m[j]}}
+ else{const b1=0.9,b2=0.999,c1=1-b1**st.it,c2=1-b2**st.it;for(let j=0;j<D;j++){st.m[j]=b1*st.m[j]+(1-b1)*g[j];st.v[j]=b2*st.v[j]+(1-b2)*g[j]*g[j];w[j]-=lr*(st.m[j]/c1)/(Math.sqrt(st.v[j]/c2)+1e-12)}}}
+
+{
+const $=id=>document.getElementById(id);
+const S={N:10,sig:.3,grid:true,seed:1,M:9,sc:true,l2:false,lnl:-18,opt:'cf',lr:.5,lrauto:true,maxit:100000,spd:100,showtest:false};
+let D,T,Phi,A,b,ws,eig,L,opt,hist=[],running=false,diverged=false,sweep={m:[],l:[],n:[]},cfR={tr:0,te:0};
+const lam=()=>S.l2?Math.exp(S.lnl):0;
+const fmt=v=>!isFinite(v)?'—':v===0?'0':Math.abs(v)>=1e4||Math.abs(v)<1e-3?v.toExponential(2):v.toFixed(Math.abs(v)<1?4:3);
+const col=n=>{const p=$('probe');p.style.color=`var(--${n})`;return getComputedStyle(p).color};
+// 公式片段（#tex 里由 KaTeX 预渲染）；eq('M',9) → 「M = 9」，等号和数字用 KaTeX 的正文字体
+const TX={};document.querySelectorAll('#tex [data-k]').forEach(e=>{TX[e.dataset.k]=e.innerHTML});
+const TeX=k=>TX[k]??k,num=v=>String(v).replace(/^-/,'−'),eq=(k,v)=>`${TeX(k)}<span class="km"><span class="rel">=</span>${num(v)}</span>`;
+const ff=()=>getComputedStyle(document.body).fontFamily;
+
+function rebuild(keepRun){
+ D=genData(S.N,S.sig,S.seed,S.grid);T=genData(1000,S.sig,S.seed+7919,false);
+ Phi=design(D.x,S.M,S.sc);({A,b}=normalEq(Phi,D.y,lam()));ws=closedForm(Phi,D.y,lam());
+ eig=eigSym(A);L=eig[eig.length-1];cfR={tr:rmse(ws,D.x,D.y,S.sc),te:rmse(ws,T.x,T.y,S.sc)};
+ if(S.lrauto){S.lr=S.opt==='adam'?0.01:S.opt==='mom'?0.1/L:1/L;$('lr').value=+S.lr.toPrecision(4)}
+ resetOpt(keepRun);sweepLater();
+}
+function resetOpt(keepRun){opt=newOpt(S.opt==='cf'?'gd':S.opt,S.M+1,A,b);if(S.opt==='cf')opt.w=Float64Array.from(ws);hist=[];diverged=false;if(S.opt!=='cf')record(true);if(!keepRun)stop();paint()}
+let nextRec=1;
+function record(force){if(force)nextRec=1;if(!force&&opt.it<nextRec)return;nextRec=Math.max(opt.it+1,Math.ceil(opt.it*1.03));
+ const tr=rmse(opt.w,D.x,D.y,S.sc),te=rmse(opt.w,T.x,T.y,S.sc);hist.push([Math.max(opt.it,1),tr,te]);
+ if(!isFinite(tr)||tr>1e6){diverged=true;stop()}}
+function iterate(n){for(let k=0;k<n&&opt.it<S.maxit&&!opt.done&&!diverged;k++){step(opt,A,b,S.lr);record(false)}
+ if(opt.it>=S.maxit||opt.done){if(hist.length&&hist[hist.length-1][0]!==opt.it){nextRec=0;record(false)}stop()}}
+function loop(){if(!running)return;iterate(S.spd);paint();if(running)requestAnimationFrame(loop)}
+function start(){if(S.opt==='cf')return;if(opt.it>=S.maxit||opt.done||diverged)resetOpt(true);running=true;$('run').textContent='暂停';requestAnimationFrame(loop)}
+function stop(){running=false;$('run').textContent='开始训练'}
+
+// ---------- sweeps (closed form) ----------
+let swT;function sweepLater(){clearTimeout(swT);swT=setTimeout(()=>{doSweep();paintSweeps()},90)}
+function cfOn(d,M,l){const P=design(d.x,M,S.sc),w=closedForm(P,d.y,l);return[rmse(w,d.x,d.y,S.sc),rmse(w,T.x,T.y,S.sc)]}
+function doSweep(){sweep.m=[];for(let M=0;M<=15;M++)sweep.m.push([M,...cfOn(D,M,lam())]);
+ sweep.l=[];for(let v=-40;v<=0;v+=.5)sweep.l.push([v,...cfOn(D,S.M,Math.exp(v))]);
+ sweep.n=[];for(const N of [3,5,8,10,15,20,30,50,75,100,150,200]){let a=0,c=0;for(let r=0;r<20;r++){const d=genData(N,S.sig,1000+r*31+N,S.grid);const[x,y]=cfOn(d,S.M,lam());a+=x;c+=y}sweep.n.push([N,a/20,c/20])}}
+
+// ---------- canvas chart helper ----------
+function setup(f){const cv=f.querySelector('canvas'),W=cv.clientWidth,H=cv.clientHeight,r=devicePixelRatio||1;cv.width=W*r;cv.height=H*r;const c=cv.getContext('2d');c.setTransform(r,0,0,r,0,0);c.clearRect(0,0,W,H);return{c,W,H}}
+function frame(f,o){const{c,W,H}=setup(f),sm=W<420,pl=sm?40:52,pr=12,pt=10,pb=sm?32:40;
+ const tx=v=>o.xlog?Math.log10(v):v,ty=v=>o.ylog?Math.log10(Math.max(v,o.yr[0])):v;
+ const X=v=>pl+(tx(v)-tx(o.xr[0]))/(tx(o.xr[1])-tx(o.xr[0]))*(W-pl-pr),Y=v=>pt+(1-(ty(v)-ty(o.yr[0]))/(ty(o.yr[1])-ty(o.yr[0])))*(H-pt-pb);
+ c.font='12px '+ff();c.lineWidth=1;const g=col('grid'),k2=col('ink2');
+ c.fillStyle=k2;c.textAlign='right';c.textBaseline='middle';for(const v of o.yt){const y=Y(v);c.strokeStyle=g;c.beginPath();c.moveTo(pl,y);c.lineTo(W-pr,y);c.stroke();c.fillText(o.fy(v),pl-6,y)}
+ c.textAlign='center';c.textBaseline='top';const xt=sm&&o.xt.length>6?o.xt.filter((_,i)=>i%2===0):o.xt;for(const v of xt){const x=X(v);c.strokeStyle=g;c.beginPath();c.moveTo(x,pt);c.lineTo(x,H-pb);c.stroke();c.fillText(o.fx(v),x,H-pb+5)}
+ c.textAlign='right';c.textBaseline='bottom';axisLabel(c,o.xl,W-pr,H-2);c.font='12px '+ff();
+ const box=[pl,pt,W-pl-pr,H-pt-pb];return{c,W,H,X,Y,box,clip(){c.save();c.beginPath();c.rect(...box);c.clip()},inv(px){const t=(px-pl)/(W-pl-pr);const a=tx(o.xr[0]),bb=tx(o.xr[1]);const v=a+t*(bb-a);return o.xlog?10**v:v}}}
+// 坐标轴名：单个字母（x、M、N、λ）用 KaTeX 的数学斜体，ln 用正体，其余用正文字体，和页面里的公式一致
+function axisLabel(c,txt,x,y){const seg=txt.split(' ').map((t,i,a)=>[t+(i<a.length-1?' ':''),/^[A-Za-zα-ω]$/.test(t)?'italic 14px KaTeX_Math,"Times New Roman",serif':t==='ln'?'13px KaTeX_Main,"Times New Roman",serif':'12px '+ff()]);
+ for(let i=seg.length-1;i>=0;i--){c.font=seg[i][1];c.fillText(seg[i][0],x,y);x-=c.measureText(seg[i][0]).width}}
+function line(g,pts,color,w=2,dash){const{c,X,Y}=g;c.strokeStyle=color;c.lineWidth=w;c.setLineDash(dash||[]);c.beginPath();let on=false;for(const[x,y]of pts){if(!isFinite(y)){on=false;continue}const py=Y(y);on?c.lineTo(X(x),py):c.moveTo(X(x),py);on=true}c.stroke();c.setLineDash([])}
+function dots(g,pts,color,r=4,fill){const{c,X,Y}=g;c.lineWidth=1.5;for(const[x,y]of pts){c.beginPath();c.arc(X(x),Y(y),r,0,7);if(fill){c.fillStyle=color;c.fill()}else{c.fillStyle=col('panel');c.fill();c.strokeStyle=color;c.stroke()}}}
+const logT=(a,b)=>{const t=[];for(let e=Math.floor(Math.log10(a));e<=Math.ceil(Math.log10(b));e++)if(10**e>=a*0.999&&10**e<=b*1.001)t.push(10**e);return t};
+const fe=v=>v>=1e3?'1e'+Math.round(Math.log10(v)):v<0.01?'1e'+Math.round(Math.log10(v)):String(+v.toPrecision(2));
+const hov={};
+function hover(id,fn){const f=$(id),tip=f.querySelector('.tip'),cv=f.querySelector('canvas');
+ const mv=e=>{const r=cv.getBoundingClientRect();hov[id]=e.clientX-r.left;const h=fn.tip(hov[id]);if(!h){tip.style.display='none';return}tip.innerHTML=h;tip.style.display='block';const x=hov[id],tw=tip.offsetWidth;tip.style.left=Math.min(Math.max(4,x+12),r.width-tw-4)+'px';tip.style.top='8px';fn.draw()};
+ cv.addEventListener('pointermove',mv);cv.addEventListener('pointerleave',()=>{hov[id]=null;tip.style.display='none';fn.draw()});
+ if(fn.click)cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect();fn.click(e.clientX-r.left)})}
+function cross(g,px){if(px==null||px<g.box[0]||px>g.box[0]+g.box[2])return;g.c.strokeStyle=col('ink2');g.c.lineWidth=1;g.c.beginPath();g.c.moveTo(px,g.box[1]);g.c.lineTo(px,g.box[1]+g.box[3]);g.c.stroke()}
+
+// ---------- fit plot ----------
+let gFit;
+function drawFit(){const g=gFit=frame($('f_fit'),{xr:[0,1],yr:[-1.8,1.8],xt:[0,.2,.4,.6,.8,1],yt:[-1.5,-1,-.5,0,.5,1,1.5],fx:v=>v.toFixed(1),fy:v=>String(v),xl:'x'});
+ const xs=Array.from({length:401},(_,i)=>i/400);g.clip();
+ if(S.showtest)dots(g,T.x.slice(0,300).map((x,i)=>[x,T.y[i]]),col('line'),2,true);
+ line(g,xs.map(x=>[x,Math.sin(2*Math.PI*x)]),col('ink2'),1.5,[5,4]);
+ if(S.opt!=='cf')line(g,xs.map(x=>[x,predict(ws,x,S.sc)]),col('c3'),2,[6,4]);
+ line(g,xs.map(x=>[x,predict(opt.w,x,S.sc)]),col('c1'),2.5);
+ g.c.restore();dots(g,D.x.map((x,i)=>[x,D.y[i]]),col('ink'),S.N>60?3:4.5);cross(g,hov.f_fit)}
+hover('f_fit',{draw:drawFit,tip(px){if(!gFit)return;const x=gFit.inv(px);if(x<0||x>1)return;return`${eq('x',x.toFixed(3))}<br>${eq('sin',num(Math.sin(2*Math.PI*x).toFixed(3)))}<br>当前 ${TeX('w')}：${fmt(predict(opt.w,x,S.sc))}`+(S.opt!=='cf'?`<br>解析解 ${TeX('ws')}：${fmt(predict(ws,x,S.sc))}`:'')}});
+
+// ---------- loss plot ----------
+let gLoss;
+function drawLoss(){const f=$('f_loss');if(S.opt==='cf'||!hist.length){const{c,W,H}=setup(f);c.fillStyle=col('ink2');c.font='14px '+ff();c.textAlign='center';c.fillText(S.opt==='cf'?(W<520?'解析解没有迭代过程':'解析解一步得到 w*，没有迭代过程。选一个迭代优化器再开始训练。'):'点击“开始训练”',W/2,H/2);$('best').textContent='';return}
+ const fl=1e-3,vals=hist.flatMap(h=>[h[1],h[2]]).concat([cfR.te,Math.max(cfR.tr,1e-2)]).filter(isFinite);let hi=Math.min(Math.max(...vals),1e3);hi=10**Math.ceil(Math.log10(hi*1.05));const lo=Math.max(fl,10**Math.floor(Math.log10(Math.max(Math.min(...vals),fl))));
+ const xm=Math.max(10,S.maxit);const g=gLoss=frame(f,{xr:[1,xm],yr:[lo,hi],xlog:1,ylog:1,xt:logT(1,xm),yt:logT(lo,hi),fx:fe,fy:fe,xl:'迭代次数'});
+ g.clip();line(g,[[1,cfR.tr],[xm,cfR.tr]],col('c1'),1.5,[6,4]);line(g,[[1,cfR.te],[xm,cfR.te]],col('c2'),1.5,[6,4]);
+ line(g,hist.map(h=>[h[0],h[1]]),col('c1'));line(g,hist.map(h=>[h[0],h[2]]),col('c2'));
+ let bi=0;hist.forEach((h,i)=>{if(h[2]<hist[bi][2])bi=i});const bh=hist[bi];dots(g,[[bh[0],bh[2]]],col('acc'),5,true);g.c.restore();cross(g,hov.f_loss);
+ $('best').innerHTML=`<i class="dot" style="color:var(--acc);background:var(--acc)"></i>测试 RMSE 最低 ${fmt(bh[2])} @ 第 ${bh[0]} 步`+(diverged?' · <span class="bad">已发散</span>':'')}
+hover('f_loss',{draw:drawLoss,tip(px){if(!gLoss||!hist.length||S.opt==='cf')return;const it=gLoss.inv(px);let h=hist[0];for(const r of hist){if(Math.abs(Math.log(r[0]/it))<Math.abs(Math.log(h[0]/it)))h=r}return`第 ${h[0]} 步<br>训练 ${fmt(h[1])}<br>测试 ${fmt(h[2])}`}});
+
+// ---------- sweep plots ----------
+const SW={f_m:{k:'m',xr:[0,15],xt:[0,3,6,9,12,15],fx:v=>String(v),xl:'M',tk:'M',cur:()=>S.M,set:v=>{S.M=Math.round(Math.min(15,Math.max(0,v)))}},
+ f_l:{k:'l',xr:[-40,0],xt:[-40,-30,-20,-10,0],fx:v=>String(v),xl:'ln λ',tk:'lnl',cur:()=>S.l2?S.lnl:-40,set:v=>{S.l2=true;S.lnl=Math.round(Math.min(0,Math.max(-40,v))*2)/2}},
+ f_n:{k:'n',xr:[3,200],xlog:1,xt:[3,10,30,100,200],fx:v=>String(v),xl:'N',tk:'N',cur:()=>S.N,set:v=>{S.N=Math.round(Math.min(200,Math.max(2,v)))}}};
+let swR=[.01,10];const gs={};
+function paintSweeps(){const all=['m','l','n'].flatMap(k=>sweep[k].flatMap(r=>[r[1],r[2]])).filter(v=>isFinite(v)&&v>0);
+ const lo=Math.max(1e-3,10**Math.floor(Math.log10(Math.min(...all,S.sig||1)))),hi=10**Math.ceil(Math.log10(Math.min(Math.max(...all),1e4)));swR=[lo,hi];for(const id in SW)drawSweep(id)}
+function drawSweep(id){const s=SW[id],d=sweep[s.k];if(!d.length)return;const g=gs[id]=frame($(id),{...s,yr:swR,ylog:1,yt:logT(...swR),fy:fe});
+ g.clip();if(S.sig>0)line(g,[[s.xr[0],S.sig],[s.xr[1],S.sig]],col('ink2'),1.2,[4,4]);
+ const cx=g.X(s.cur());g.c.strokeStyle=col('acc');g.c.lineWidth=2;g.c.beginPath();g.c.moveTo(cx,g.box[1]);g.c.lineTo(cx,g.box[1]+g.box[3]);g.c.stroke();
+ line(g,d.map(r=>[r[0],Math.max(r[1],swR[0])]),col('c1'));line(g,d.map(r=>[r[0],r[2]]),col('c2'));
+ if(s.k!=='l'){dots(g,d.map(r=>[r[0],Math.max(r[1],swR[0])]),col('c1'),3.5);dots(g,d.map(r=>[r[0],r[2]]),col('c2'),3.5)}g.c.restore();cross(g,hov[id])}
+const near=(d,v,lg)=>d.reduce((a,r)=>Math.abs(lg?Math.log(r[0]/v):r[0]-v)<Math.abs(lg?Math.log(a[0]/v):a[0]-v)?r:a,d[0]);
+for(const id in SW){const s=SW[id];hover(id,{draw:()=>drawSweep(id),tip(px){const g=gs[id];if(!g||!sweep[s.k].length)return;const r=near(sweep[s.k],g.inv(px),s.xlog);return`${eq(s.tk,r[0])}<br>训练 ${fmt(r[1])}<br>测试 ${fmt(r[2])}<br><span class="hint">点击设为此值</span>`},
+ click(px){const g=gs[id];if(!g)return;const r=near(sweep[s.k],g.inv(px),s.xlog);s.set(r[0]);syncUI();rebuild()}})}
+
+// ---------- readouts ----------
+function paint(){const tr=rmse(opt.w,D.x,D.y,S.sc),te=rmse(opt.w,T.x,T.y,S.sc),wn=Math.sqrt(dot(opt.w,opt.w)),k=eig[0]>0?L/eig[0]:Infinity;
+ const tiles=[['迭代',S.opt==='cf'?'—':opt.it+(opt.done?' ✓':'')],['训练 RMSE',fmt(tr)],['测试 RMSE',fmt(te),1],['解析解 测试',fmt(cfR.te)],[TeX('wn'),fmt(wn)],[TeX('kappa'),isFinite(k)?k.toExponential(1):'∞']];
+ $('tiles').innerHTML=tiles.map(t=>`<div class="tile${t[2]?' hot':''}"><span>${t[0]}</span><b>${t[1]}</b></div>`).join('');
+ const s=S.sig,thr=s+0.05;let d;if(diverged)d=`<b>已发散</b>：${TeX('eta')} 超过稳定上限 ${TeX('2L')}，参数沿最大特征方向指数增长。`;
+ else if(te>1.25*s+0.05&&te-tr>0.4*s+0.05)d=`<b>过拟合</b>：训练 RMSE ${fmt(tr)}${tr<s?' 低于噪声 '+eq('sigma',s):''}，测试 RMSE ${fmt(te)} 明显高于 ${TeX('sigma')}，两者差距 ${fmt(te-tr)}。`;
+ else if(tr>1.25*thr&&te>1.25*thr)d=`<b>欠拟合</b>：训练和测试 RMSE（${fmt(tr)} / ${fmt(te)}）都明显高于噪声 ${eq('sigma',s)}。`;
+ else d=`拟合合理：训练 / 测试 RMSE = ${fmt(tr)} / ${fmt(te)}，接近噪声水平 ${eq('sigma',s)}。`;
+ $('diag').innerHTML=`${eq('M',S.M)}，${eq('N',S.N)}，${S.l2?eq('lnl',S.lnl):eq('lam',0)} · `+d;
+ const r=S.lr*L,lim=S.opt==='mom'?3.8:2;$('lrinfo').innerHTML=S.opt==='cf'||S.opt==='cg'?'此方法不使用学习率。':S.opt==='adam'?`Adam 按坐标自适应缩放，${TeX('eta')} 是每步大致的更新幅度。`:`${eq('L',fmt(L))}，${eq('etaL',r.toFixed(3))}`+(r>lim?` <span class="bad">&gt; ${lim}，会发散</span>`:`（稳定上限 ${lim}）`);
+ $('coef').innerHTML=Array.from(opt.w,(v,j)=>`<tr><td>${j}</td><td>${fmt(v)}</td><td>${fmt(ws[j])}</td></tr>`).join('')+`<tr><td>${TeX('wn')}</td><td>${fmt(wn)}</td><td>${fmt(Math.sqrt(dot(ws,ws)))}</td></tr>`;
+ drawFit();drawLoss()}
+
+// ---------- UI wiring ----------
+function syncUI(){$('N').value=S.N;$('oN').textContent=S.N;$('sig').value=S.sig;$('osig').textContent=S.sig.toFixed(2);$('samp').value=S.grid?'grid':'rand';$('seed').value=S.seed;
+ $('M').value=S.M;$('oM').textContent=S.M;$('sc').checked=S.sc;$('l2').checked=S.l2;$('lnl').value=S.lnl;$('lnl').disabled=!S.l2;$('olnl').textContent=S.l2?S.lnl.toFixed(1):'关';
+ $('opt').value=S.opt;$('lrauto').checked=S.lrauto;$('lr').disabled=S.lrauto;$('maxit').value=S.maxit;$('spd').value=S.spd;$('showtest').checked=S.showtest;
+ const it=S.opt==='cf';for(const i of['run','one','reset','lr','lrauto','maxit','spd'])$(i).disabled=it||(i==='lr'&&S.lrauto)}
+const bind=(id,ev,fn)=>$(id).addEventListener(ev,e=>{fn(e.target);syncUI()});
+bind('N','input',t=>{S.N=+t.value;rebuild()});bind('sig','input',t=>{S.sig=+t.value;rebuild()});bind('samp','change',t=>{S.grid=t.value==='grid';rebuild()});
+bind('seed','change',t=>{S.seed=Math.max(0,+t.value|0);rebuild()});bind('reseed','click',()=>{S.seed++;rebuild()});
+bind('M','input',t=>{S.M=+t.value;rebuild()});bind('sc','change',t=>{S.sc=t.checked;rebuild()});bind('l2','change',t=>{S.l2=t.checked;rebuild()});bind('lnl','input',t=>{S.lnl=+t.value;rebuild()});
+bind('opt','change',t=>{S.opt=t.value;rebuild()});bind('lrauto','change',t=>{S.lrauto=t.checked;rebuild()});bind('lr','change',t=>{const v=+t.value;if(v>0)S.lr=v;resetOpt()});
+bind('maxit','change',t=>{S.maxit=+t.value;paint()});bind('spd','change',t=>{S.spd=+t.value});bind('showtest','change',t=>{S.showtest=t.checked;drawFit()});
+bind('run','click',()=>running?stop():start());bind('one','click',()=>{if(opt.it>=S.maxit||opt.done)return;step(opt,A,b,S.lr);nextRec=0;record(false);paint()});bind('reset','click',()=>resetOpt());
+
+const P=[['欠拟合 M=1',{M:1,N:10,l2:false,opt:'cf'}],['合适 M=3',{M:3,N:10,l2:false,opt:'cf'}],['过拟合 M=9',{M:9,N:10,l2:false,opt:'cf'}],['加 L2 ln λ=−18',{M:9,N:10,l2:true,lnl:-18,opt:'cf'}],['增加样本 N=100',{M:9,N:100,l2:false,opt:'cf'}],
+ ['GD 与早停',{M:9,N:10,l2:false,opt:'gd',lrauto:true,maxit:1000000,spd:1000,go:1}],['CG 快速收敛',{M:9,N:10,l2:false,opt:'cg',maxit:1000,spd:1,go:1}],['学习率过大',{M:9,N:10,l2:false,opt:'gd',lrauto:false,lrx:2.05,maxit:1000,spd:1,go:1}],['不缩放特征',{M:9,N:10,l2:false,sc:false,opt:'gd',lrauto:true,maxit:1000000,spd:1000,go:1}]];
+// 按钮写在 HTML 里（标签里的公式要在构建时渲染），顺序与 P 一一对应
+$('presets').addEventListener('click',e=>{const i=e.target.closest?.('button')?.dataset.i;if(i==null)return;const o=P[i][1];stop();Object.assign(S,{sc:true,sig:.3,grid:true,seed:1},o);delete S.go;delete S.lrx;syncUI();rebuild();if(o.lrx){S.lr=o.lrx/L;$('lr').value=+S.lr.toPrecision(4);resetOpt()}if(o.go)start()});
+
+async function copy(txt){try{await navigator.clipboard.writeText(txt);$('cpmsg').textContent='已复制'}catch{$('cpmsg').textContent='浏览器拒绝了剪贴板，请手动选择复制'}}
+$('cpsum').addEventListener('click',()=>{const tr=rmse(opt.w,D.x,D.y,S.sc),te=rmse(opt.w,T.x,T.y,S.sc);copy(`N=${S.N} sigma=${S.sig} sampling=${S.grid?'grid':'random'} seed=${S.seed}\nM=${S.M} scaled=${S.sc} lambda=${S.l2?'exp('+S.lnl+')':0}\noptimizer=${S.opt} lr=${S.lr} iters=${opt.it}\ntrain_rmse=${tr} test_rmse=${te}\nclosed_form_train=${cfR.tr} closed_form_test=${cfR.te}\nkappa=${L/eig[0]}\nw=${Array.from(opt.w).join(',')}\nw_star=${Array.from(ws).join(',')}`)});
+$('cpcsv').addEventListener('click',()=>copy(['sweep,x,train_rmse,test_rmse',...['m','l','n'].flatMap(k=>sweep[k].map(r=>[{m:'M',l:'ln_lambda',n:'N'}[k],...r].join(',')))].join('\n')));
+
+const ro=new ResizeObserver(()=>{paint();paintSweeps()});ro.observe($('f_fit'));
+const mo=new MutationObserver(()=>{paint();paintSweeps()});mo.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme','data-embedded','style']});
+document.fonts?.addEventListener('loadingdone',()=>{paint();paintSweeps()});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{paint();paintSweeps()});
+syncUI();rebuild();doSweep();paintSweeps();
+}
+</script>
+</body>
+</html>
