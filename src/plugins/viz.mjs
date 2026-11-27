@@ -4,8 +4,12 @@
 //   viz-raw/fourier.html            → /viz-raw/fourier.html（原始页面） + /viz/fourier/（带说明的浏览页）
 //   viz-raw/attention/index.html    → /viz-raw/attention/index.html     + /viz/attention/
 //   viz-raw/_shared/…               → 下划线开头的文件/文件夹只复制、不进图库（放公共脚本、数据）
+//
+// 公式：在 HTML 正文里（<script>/<style> 之外）写 \( … \) 是行内公式，\[ … \] 是独占一行的公式。
+// 复制时用 KaTeX 预渲染成静态 HTML（和笔记同一套，浏览器端不跑 JS），并自动引入 /viz-raw/_katex/ 下的样式和字体。
 import fs from 'node:fs';
 import path from 'node:path';
+import katex from 'katex';
 
 export const VIZ_SRC = path.resolve('viz-raw');
 
@@ -79,11 +83,57 @@ export function vizLoader() {
   };
 }
 
+const KATEX_DIST = path.resolve('node_modules/katex/dist');
+const KATEX_CSS = '/viz-raw/_katex/katex.min.css';
+
+/** 把 HTML 正文里的 \( … \) / \[ … \] 渲染成 KaTeX；<script>、<style>、注释原样保留。没有公式时返回 null */
+export function renderVizMath(html) {
+  let found = false;
+  const parts = html.split(/(<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<!--[\s\S]*?-->)/i);
+  for (let i = 0; i < parts.length; i += 2) {
+    parts[i] = parts[i].replace(/\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)/g, (_, display, inline) => {
+      found = true;
+      return katex.renderToString(decode(display ?? inline).trim(), {
+        displayMode: display != null,
+        throwOnError: false,
+        strict: false,
+      });
+    });
+  }
+  if (!found) return null;
+  const out = parts.join('');
+  // 样式表放在可视化自己的 <style> 前面，方便它覆盖 .katex 的字号等
+  const link = `<link rel="stylesheet" href="${KATEX_CSS}">\n`;
+  const at = out.search(/<style\b|<\/head>/i);
+  return at < 0 ? link + out : out.slice(0, at) + link + out.slice(at);
+}
+
+function walkHtml(dir, fn) {
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, ent.name);
+    if (ent.isDirectory()) walkHtml(p, fn);
+    else if (ent.name.endsWith('.html')) fn(p);
+  }
+}
+
 function copyAll(dest, logger) {
   fs.rmSync(dest, { recursive: true, force: true });
   if (!fs.existsSync(VIZ_SRC)) return;
   fs.cpSync(VIZ_SRC, dest, { recursive: true });
-  logger?.info(`复制了 ${listViz().length} 个可视化到 public/viz-raw/`);
+  let withMath = 0;
+  walkHtml(dest, (p) => {
+    const out = renderVizMath(fs.readFileSync(p, 'utf8'));
+    if (out == null) return;
+    fs.writeFileSync(p, out);
+    withMath++;
+  });
+  if (withMath > 0) {
+    const kd = path.join(dest, '_katex');
+    fs.mkdirSync(kd, { recursive: true });
+    fs.copyFileSync(path.join(KATEX_DIST, 'katex.min.css'), path.join(kd, 'katex.min.css'));
+    fs.cpSync(path.join(KATEX_DIST, 'fonts'), path.join(kd, 'fonts'), { recursive: true });
+  }
+  logger?.info(`复制了 ${listViz().length} 个可视化到 public/viz-raw/` + (withMath ? `，其中 ${withMath} 个含公式` : ''));
 }
 
 /** Astro 集成：启动和构建前复制，dev 下监听改动并刷新页面 */
